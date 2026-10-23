@@ -80,7 +80,7 @@ This is run on a Macbook M1 ;)
 pg_tps_optimizer supports these environment variables to be used.
 See [docs/connecting.md](docs/connecting.md) for how connection settings, TLS (`sslmode`) and certificates work.
 
-PGHOST=/tmp
+PGHOST=/var/run/postgresql or /tmp # Defaults to the one that has a socket for PGPORT
 PGUSER=$(id -u -n) # Defaults to current user
 PGDATABASE=${PGUSER}
 PGPASSWORD=***** # Defaults to emptystring which basically cannot work. For ident, trust, cert, etc. Just set a dummy password.
