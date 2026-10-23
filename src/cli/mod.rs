@@ -127,7 +127,7 @@ impl Params {
         let re = regex::Regex::new(r"\d+").unwrap();
         let values: Vec<_> = re
             .find_iter(self.range.as_str())
-            .filter_map(|digits| (digits.as_str().parse().ok()))
+            .filter_map(|digits| digits.as_str().parse().ok())
             .collect();
         match values.len() {
             0 => (1, 1000),
