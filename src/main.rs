@@ -1,6 +1,4 @@
-extern crate args;
 extern crate chrono;
-extern crate getopts;
 extern crate postgres;
 
 mod cli;
@@ -24,6 +22,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Params::get_args();
 
     println!("Initializing");
+    // Validate before connecting
+    let max_wait: chrono::Duration = args.as_max_wait()?;
     let (min_threads, max_threads) = args.range_min_max();
     let w: Workload = args.as_workload();
     println!("{}", w.as_string());
@@ -31,7 +31,6 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     let mut sampler = pg_sampler::PgSampler::new(args.as_dsn())?;
     sampler.next()?;
     let mut instable: bool = false;
-    let max_wait: chrono::Duration = args.as_max_wait();
 
     println!("min threads: {} max threads: {}", min_threads, max_threads);
     println!(
