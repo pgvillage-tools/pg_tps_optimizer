@@ -1,7 +1,15 @@
 #!/bin/bash
-VERSION=$(echo $GITHUB_REF | cut -d / -f 3)
+# Only use GITHUB_REF when it points at a tag (e.g. refs/tags/v1.2.3)
+if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+  VERSION=${GITHUB_REF#refs/tags/}
+fi
 if [ -z "${VERSION}" ]; then
   VERSION=$(git tag | sort -V | grep '^v' | tail -n1)
 fi
 VERSION=$(echo $VERSION | sed 's/[^0-9.]//g')
-sed -i "s/^version = .*/version = \"${VERSION}\"/" Cargo.toml
+if [ -z "${VERSION}" ]; then
+  echo "Could not determine version, leaving Cargo.toml as is"
+  exit 0
+fi
+# perl instead of sed -i, which differs between GNU (linux) and BSD (macOS)
+perl -pi -e "s/^version = .*/version = \"${VERSION}\"/" Cargo.toml
