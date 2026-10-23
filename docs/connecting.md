@@ -17,7 +17,8 @@ Connection settings come from three places. Later sources override earlier ones:
 
 | Setting | Environment variable | Default |
 |---|---|---|
-| `host` | `PGHOST` | the unix socket directory with a running server for `port`: `/var/run/postgresql` or `/tmp` (`/tmp` when neither has one) |
+| `host` | `PGHOST` | `hostaddr` when that is set; otherwise the unix socket directory with a running server for `port`: `/var/run/postgresql` or `/tmp` (`/tmp` when neither has one) |
+| `hostaddr` | `PGHOSTADDR` | not set |
 | `port` | `PGPORT` | `5432` |
 | `user` | `PGUSER` | the current OS user |
 | `dbname` | `PGDATABASE` | the user name |
@@ -26,6 +27,17 @@ Connection settings come from three places. Later sources override earlier ones:
 | `sslcert` | `PGSSLCERT` | `~/.postgresql/postgresql.crt`, if it exists |
 | `sslkey` | `PGSSLKEY` | `~/.postgresql/postgresql.key`, if it exists |
 | `sslrootcert` | `PGSSLROOTCERT` | `~/.postgresql/root.crt`, if it exists |
+| `application_name` | `PGAPPNAME` | not set |
+| `options` | `PGOPTIONS` | not set |
+| `connect_timeout` | `PGCONNECT_TIMEOUT` | no timeout |
+| `target_session_attrs` | `PGTARGETSESSIONATTRS` | `any` (also `read-write`, `read-only`) |
+| `channel_binding` | `PGCHANNELBINDING` | `prefer` |
+| `load_balance_hosts` | `PGLOADBALANCEHOSTS` | `disable` |
+| `sslnegotiation` | `PGSSLNEGOTIATION` | `postgres` |
+
+Other settings the PostgreSQL driver supports (`tcp_user_timeout`, `keepalives`, `keepalives_idle`,
+`keepalives_interval`, `keepalives_retries`) can be set in the connection string; libpq has no
+environment variables for them either.
 
 ### Connection string format
 
