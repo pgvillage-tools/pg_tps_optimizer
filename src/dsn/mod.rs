@@ -1,16 +1,36 @@
 use crate::generic;
-use openssl::ssl::{SslConnector, SslFiletype, SslMethod};
-use postgres::{Client, NoTls};
+use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use openssl::x509::store::X509StoreBuilder;
+use postgres::config::SslMode;
+use postgres::{Client, Config, NoTls};
 use postgres_openssl::MakeTlsConnector;
-use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::error::Error;
 use std::fmt;
+use std::path::Path;
 use uzers::{get_current_uid, get_user_by_uid};
 
 #[derive(Debug, Clone)]
 pub struct Dsn {
     kv: HashMap<String, String>,
     ssl_mode: String,
+    // Parts of the connection string that are not key=value, reported when connecting
+    invalid: Vec<String>,
+}
+
+// The postgres crate keeps the details (like the server message) in the error source, so add
+// the sources to the message (skipping sources that are already part of it)
+fn error_chain(err: &dyn Error) -> String {
+    let mut message = err.to_string();
+    let mut source = err.source();
+    while let Some(err) = source {
+        let text = err.to_string();
+        if !message.contains(&text) {
+            message = format!("{}: {}", message, text);
+        }
+        source = err.source();
+    }
+    message
 }
 
 fn os_user_name() -> String {
@@ -44,19 +64,11 @@ impl Dsn {
         for s in split {
             if let Some((key, value)) = s.split_once('=') {
                 dsn.set_value(key, value)
+            } else if !s.is_empty() {
+                dsn.invalid.push(s.to_string())
             }
         }
         dsn
-    }
-    pub fn copy(&self) -> Dsn {
-        let mut kv: HashMap<String, String> = HashMap::new();
-        for (k, v) in self.kv.borrow() {
-            kv.insert(k.to_string(), v.to_string());
-        }
-        Dsn {
-            kv,
-            ssl_mode: self.ssl_mode.to_string(),
-        }
     }
     pub fn cleanse(&self) -> Dsn {
         let mut kv: HashMap<String, String> = HashMap::new();
@@ -65,9 +77,14 @@ impl Dsn {
         kv.remove("sslcert");
         kv.remove("sslkey");
         kv.remove("sslrootcert");
+        // sslcrl is not supported (yet), ignore it so a DSN that sets it can still connect
         kv.remove("sslcrl");
         let ssl_mode = "disable".to_string();
-        Dsn { kv, ssl_mode }
+        Dsn {
+            kv,
+            ssl_mode,
+            invalid: self.invalid.clone(),
+        }
     }
     pub fn new() -> Dsn {
         let mut kv: HashMap<String, String> = HashMap::new();
@@ -105,11 +122,11 @@ impl Dsn {
             // So, for empty [assword we use a string containing just a letter p
             generic::get_env_str("", "PGPASSWORD", ""),
         );
-        kv.insert(
-            "sslcrl".to_string(),
-            generic::get_env_path("", "PGSSLCRL", "~/.postgresql/root.crl"),
-        );
-        Dsn { kv, ssl_mode }
+        Dsn {
+            kv,
+            ssl_mode,
+            invalid: Vec::new(),
+        }
     }
     pub fn debug(&self) -> String {
         let mut vec = Vec::new();
@@ -142,42 +159,141 @@ impl Dsn {
         }
         default.to_string()
     }
+    #[cfg(test)]
     pub fn use_tls(&self) -> bool {
         self.ssl_mode.ne("disable")
     }
     pub fn verify_hostname(&self) -> bool {
         self.ssl_mode.eq("verify-full")
     }
-    pub fn client(self) -> Result<Client, Box<dyn std::error::Error>> {
-        let copy = self.cleanse().to_string();
-        let conn_string = copy.as_str();
-        let cert_file = self.get_value("sslcert", "");
-        if !self.copy().use_tls() || cert_file.is_empty() {
-            let client = postgres::Client::connect(conn_string, NoTls)?;
-            return Ok(client);
-            // The source_connection object performs the actual communication
-            // with the database, so spawn it off to run on its own.
+    pub fn verify_ca(&self) -> bool {
+        self.ssl_mode.eq("verify-ca") || self.ssl_mode.eq("verify-full")
+    }
+    // Connect like libpq would for the configured sslmode. The postgres crate only knows
+    // disable, prefer and require, so allow, verify-ca and verify-full are built from those, and
+    // the certificate checks are configured on the TLS connector.
+    pub fn client(&self) -> Result<Client, Box<dyn Error>> {
+        if let Some(part) = self.invalid.first() {
+            return Err(format!(
+                "invalid connection string: \"{}\" is not a key=value pair (URLs are not supported)",
+                part
+            )
+            .into());
         }
+        let mut config: Config = self
+            .cleanse()
+            .to_string()
+            .parse()
+            .map_err(|e: postgres::Error| error_chain(&e))?;
+        // Like libpq, sslmode is ignored for unix sockets. The postgres crate uses one sslmode
+        // for all hosts, so a mix of unix sockets and TCP hosts can't skip TLS for the sockets
+        // only, and must not drop TLS for the TCP hosts.
+        let host = self.get_value("host", "");
+        let sockets = host.split(',').filter(|h| h.starts_with('/')).count();
+        let ssl_mode = if sockets == host.split(',').count() {
+            "disable"
+        } else if sockets > 0
+            && ["require", "verify-ca", "verify-full"].contains(&self.ssl_mode.as_str())
+        {
+            return Err(format!(
+                "host \"{}\" mixes unix sockets and TCP hosts, which is not supported with \
+                 sslmode={}",
+                host, self.ssl_mode
+            )
+            .into());
+        } else {
+            self.ssl_mode.as_str()
+        };
+        let result = match ssl_mode {
+            "disable" => config.ssl_mode(SslMode::Disable).connect(NoTls),
+            // First try without TLS, and only with TLS when that fails
+            "allow" => match config.clone().ssl_mode(SslMode::Disable).connect(NoTls) {
+                Ok(client) => Ok(client),
+                Err(_) => config
+                    .ssl_mode(SslMode::Require)
+                    .connect(self.tls_connector()?),
+            },
+            "prefer" => config
+                .ssl_mode(SslMode::Prefer)
+                .connect(self.tls_connector()?),
+            "require" | "verify-ca" | "verify-full" => config
+                .ssl_mode(SslMode::Require)
+                .connect(self.tls_connector()?),
+            other => return Err(format!("invalid sslmode value: \"{}\"", other).into()),
+        };
+        result.map_err(|e| {
+            format!(
+                "connection to server at \"{}\", port {} failed: {}",
+                self.get_value("host", ""),
+                self.get_value("port", ""),
+                error_chain(&e)
+            )
+            .into()
+        })
+    }
+    fn tls_connector(&self) -> Result<MakeTlsConnector, Box<dyn Error>> {
         let mut builder = SslConnector::builder(SslMethod::tls())?;
-        if let Err(error) = builder.set_certificate_chain_file(cert_file) {
-            eprintln!("set_certificate_file: {}", error);
+
+        // Only use a client certificate when one is set, or the default one exists. The
+        // certificate and key only work as a pair.
+        let cert_file = self.get_value("sslcert", "");
+        let key_file = self.get_value("sslkey", "");
+        if cert_file.is_empty() && !key_file.is_empty() {
+            return Err(format!(
+                "sslkey is set (\"{}\"), but sslcert is not; a client certificate needs both",
+                key_file
+            )
+            .into());
         }
-        let private_key = self.get_value("sslkey", "~/.postgresql/postgresql.key");
-        if let Err(error) = builder.set_private_key_file(private_key, SslFiletype::PEM) {
-            eprintln!("set_client_key_file: {}", error);
+        if !cert_file.is_empty() && key_file.is_empty() {
+            return Err(format!(
+                "sslcert is set (\"{}\"), but sslkey is not; a client certificate needs both",
+                cert_file
+            )
+            .into());
         }
-        let root_cert = self.get_value("sslrootcert", "~/.postgresql/root.crt");
-        if let Err(error) = builder.set_ca_file(root_cert) {
-            eprintln!("set_ca_file: {}", error);
+        if !cert_file.is_empty() {
+            builder
+                .set_certificate_chain_file(&cert_file)
+                .map_err(|e| {
+                    format!("could not load client certificate \"{}\": {}", cert_file, e)
+                })?;
+            builder
+                .set_private_key_file(&key_file, SslFiletype::PEM)
+                .map_err(|e| format!("could not load private key \"{}\": {}", key_file, e))?;
+        }
+
+        // Only verify-ca and verify-full check the server certificate
+        if self.verify_ca() {
+            let root_cert = self.get_value("sslrootcert", "");
+            if root_cert.is_empty() || !Path::new(&root_cert).exists() {
+                return Err(format!(
+                    "root certificate file \"{}\" does not exist; either provide the file or \
+                     change sslmode to disable server certificate verification",
+                    match root_cert.is_empty() {
+                        true => "~/.postgresql/root.crt",
+                        false => root_cert.as_str(),
+                    }
+                )
+                .into());
+            }
+            // SslConnector::builder trusts the CAs of the OS trust store, but only sslrootcert
+            // may be trusted, so start from an empty store
+            builder.set_cert_store(X509StoreBuilder::new()?.build());
+            builder
+                .set_ca_file(&root_cert)
+                .map_err(|e| format!("could not load root certificate \"{}\": {}", root_cert, e))?;
+        } else {
+            builder.set_verify(SslVerifyMode::NONE);
         }
 
         let mut connector = MakeTlsConnector::new(builder.build());
+        let verify_hostname = self.verify_hostname();
         connector.set_callback(move |config, _| {
-            config.set_verify_hostname(self.verify_hostname());
+            config.set_verify_hostname(verify_hostname);
             Ok(())
         });
-        let client = postgres::Client::connect(conn_string, connector)?;
-        Ok(client)
+        Ok(connector)
     }
 }
 
@@ -197,7 +313,6 @@ mod tests {
         envvars.insert("PGSSLCERT", "~/cert");
         envvars.insert("PGSSLKEY", "~/key");
         envvars.insert("PGSSLROOTCERT", "~/root");
-        envvars.insert("PGSSLCRL", "~/crl");
         // and set them
         for (key, value) in envvars.iter() {
             std::env::set_var(key, value);
@@ -217,7 +332,6 @@ mod tests {
             "password='' ",
             "port='5432' ",
             "sslcert='~/cert' ",
-            "sslcrl='~/crl' ",
             "sslkey='~/key' ",
             "sslmode='verify-full' ",
             "sslrootcert='~/root' ",
@@ -239,7 +353,6 @@ mod tests {
             )
         );
         let sslcert = generic::shell_exists("~/.postgresql/postgresql.crt");
-        let sslcrl = generic::shell_exists("~/.postgresql/root.crl");
         let sslkey = generic::shell_exists("~/.postgresql/postgresql.key");
         let sslrootcert = generic::shell_exists("~/.postgresql/root.crt");
         assert_eq!(
@@ -251,15 +364,13 @@ mod tests {
                     "password='' ",
                     "port='5432' ",
                     "sslcert='{1}' ",
-                    "sslcrl='{2}' ",
-                    "sslkey='{3}' ",
+                    "sslkey='{2}' ",
                     "sslmode='prefer' ",
-                    "sslrootcert='{4}' ",
+                    "sslrootcert='{3}' ",
                     "user='{0}'"
                 ),
                 os_user_name(),
                 sslcert,
-                sslcrl,
                 sslkey,
                 sslrootcert
             )
@@ -271,6 +382,40 @@ mod tests {
                 std::env::set_var(key, value);
             }
         }
+    }
+
+    #[test]
+    fn test_invalid_connection_string() {
+        let err = Dsn::from_string("postgresql://user@host/db")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("is not a key=value pair"), "{}", err);
+
+        let err = Dsn::from_string("host=/tmp unknown_key=value")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("unknown option `unknown_key`"), "{}", err);
+    }
+
+    #[test]
+    fn test_client_certificate_needs_key_and_cert() {
+        let err = Dsn::from_string("host=localhost sslmode=require sslcert= sslkey=/my.key")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("sslkey is set"), "{}", err);
+
+        let err = Dsn::from_string("host=localhost sslmode=require sslcert=/my.crt sslkey=")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("sslcert is set"), "{}", err);
     }
 
     #[test]

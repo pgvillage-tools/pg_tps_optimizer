@@ -33,11 +33,8 @@ impl Workload {
             self.prepared
         )
     }
-    pub fn client(&self) -> Client {
-        self.dsn
-            .clone()
-            .client()
-            .expect("Cloning a client should never result in an error")
+    pub fn client(&self) -> Result<Client, Box<dyn std::error::Error>> {
+        self.dsn.client()
     }
     pub fn w_type(&self) -> WorkloadType {
         match (self.transactional, self.prepared) {

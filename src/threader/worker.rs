@@ -31,7 +31,7 @@ impl Worker {
         }
     }
     pub fn initialize(&self) -> Result<Client, Box<dyn std::error::Error>> {
-        let mut client = self.workload.client();
+        let mut client = self.workload.client()?;
         client.query(
             format!("create table if not exists {} (id oid)", TABLE_NAME).as_str(),
             &[],
@@ -76,7 +76,10 @@ impl Worker {
                     println!("Error: {}", err);
                     let sleeptime = std::time::Duration::from_millis(100);
                     thread::sleep(sleeptime);
-                    client = self.workload.client();
+                    match self.workload.client() {
+                        Ok(new_client) => client = new_client,
+                        Err(err) => eprintln!("error: worker {}: {}", self.id, err),
+                    }
                 }
             };
         }
