@@ -20,6 +20,8 @@ postgres = { version = "0.19.5", features = ["with-chrono-0_4"] }
 postgres-openssl = "0.5.0"
 range_check = "0.2.0"
 regex = "1"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
 shellexpand = "3.1.2"
 uzers = "0.12.2"
 

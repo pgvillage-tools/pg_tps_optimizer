@@ -16,9 +16,11 @@
 //! - common: helpers (certificates, PostgreSQL containers, running the binary)
 //! - sslmode: sslmode, TLS and certificates
 //! - connection: connection strings, environment variables, service files
+//! - output: output formats (JSON, graph)
 //! - workload: transactional and prepared modes
 
 mod common;
 mod connection;
+mod output;
 mod sslmode;
 mod workload;

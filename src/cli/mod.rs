@@ -1,4 +1,5 @@
 use crate::dsn::Dsn;
+use crate::output::Format;
 use crate::threader::workload::Workload;
 use clap::Parser;
 use duration_string::DurationString;
@@ -47,6 +48,10 @@ pub struct Params {
     /// Give it this ammount of seconds before we decide it wil never stabilize.
     #[arg(short = 'M', long, env = "PGTPSMAXWAIT", default_value = "10s")]
     pub max_wait: String,
+
+    /// output format: a table while running, or a JSON document at the end
+    #[arg(short, long, env = "PGTPSOUTPUT", value_enum, default_value_t = Format::Table)]
+    pub output: Format,
 }
 
 impl Params {
@@ -109,6 +114,7 @@ mod tests {
             spread: 0.0,
             min_samples: 0,
             max_wait: max_wait.to_string(),
+            output: Format::Table,
         }
     }
 

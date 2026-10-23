@@ -5,6 +5,7 @@ mod cli;
 mod dsn;
 mod fibonacci;
 mod generic;
+mod output;
 mod pg_sampler;
 mod threader;
 
@@ -27,83 +28,70 @@ fn main() {
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Params::get_args();
 
-    println!("Initializing");
     // Validate before connecting
     let max_wait: chrono::Duration = args.as_max_wait()?;
     let (min_threads, max_threads) = args.range_min_max();
+    let mut report = output::Report::new(
+        args.output,
+        output::Settings {
+            min_clients: min_threads,
+            max_clients: max_threads,
+            max_wait_seconds: max_wait.num_seconds(),
+            min_samples: args.min_samples,
+            spread: args.spread,
+            transactional: args.transactional,
+            prepared: args.prepared,
+        },
+    );
+    report.info("Initializing");
     let w: Workload = args.as_workload();
-    println!("{}", w.as_string());
+    report.info(&w.as_string());
     let mut threader = threader::Threader::new(max_threads as usize, w);
     let mut sampler = pg_sampler::PgSampler::new(args.as_dsn())?;
     sampler.next()?;
-    let mut instable: bool = false;
-
-    println!("min threads: {} max threads: {}", min_threads, max_threads);
-    println!(
-        "max_wait: {}s, min_samples: {}, spread: {}",
-        max_wait.num_seconds(),
-        args.min_samples,
-        args.spread
-    );
-
-    println!("|---------------------|---------|-----------------------------------------|-----------------------|");
-    println!("| Date       time     | Clients |                 Performance             |       Postgres        |");
-    println!("|                     |         |---------------|-----------|-------------|-----------|-----------|");
-    println!("|                     |         |      TPS      |  Latency  | TPS/Latency |   TPS     |    wal    |");
-    println!("|                     |         |               |   (usec)  |             |           |    kB/s   |");
-    println!("|---------------------|---------|---------------|-----------|-------------|-----------|-----------|");
+    report.start();
 
     for num_threads in Fibonacci::new(1_u32, 1_u32).take_while(|v| *v < max_threads) {
         if num_threads < min_threads {
             continue;
         }
         threader.scaleup(num_threads);
+        let timestamp = || chrono::offset::Local::now().to_rfc3339();
         match threader.wait_stable(args.spread, args.min_samples as usize, max_wait) {
             Some(result) => {
                 sampler.next()?;
                 let latency = result.latency.num_microseconds().unwrap() as f64;
-                let pg_tps: f64 = sampler.tps();
-                if !result.stable {
-                    instable = true;
-                }
-                println!(
-                    "| {0} | {1:7.5} | {2} {3:>11.3} | {4:>9.1} | {5:>11.3} | {6:>9.3} | {7:>9.1} |",
-                    chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    num_threads,
-                    match result.stable {
-                        true => " ",
-                        _ => "*",
-                    },
-                    result.tps,
-                    latency,
-                    result.tps / latency,
-                    pg_tps,
-                    sampler.wal_per_sec(),
-                    );
+                report.step(output::Step {
+                    timestamp: timestamp(),
+                    clients: num_threads,
+                    stable: result.stable,
+                    tps: Some(result.tps),
+                    latency_us: Some(latency),
+                    tps_per_latency: Some(result.tps / latency),
+                    postgres_tps: Some(sampler.tps()),
+                    wal_kb_per_sec: Some(sampler.wal_per_sec()),
+                });
             }
             None => {
-                println!(
-                    "| {0} | {1:7.5} |   {2:>11.3} | {3:>9.1} | {4:>11.3} | {5:>9.3} | {6:>9.3} |",
-                    chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S"),
-                    num_threads,
-                    "?",
-                    "?",
-                    "?",
-                    "?",
-                    "?"
-                );
+                report.step(output::Step {
+                    timestamp: timestamp(),
+                    clients: num_threads,
+                    stable: false,
+                    tps: None,
+                    latency_us: None,
+                    tps_per_latency: None,
+                    postgres_tps: None,
+                    wal_kb_per_sec: None,
+                });
                 break;
             }
         }
     }
-    println!("|---------------------|---------|---------------|-----------|-------------|-----------|-----------|");
+    report.finish()?;
 
-    if instable {
-        println!("* Samples marked with '*' did not stabilize before max-wait.")
-    }
-    println!("Stopping, but lets give the threads some time to stop");
+    report.info("Stopping, but lets give the threads some time to stop");
     threader.finish();
 
-    println!("Finished");
+    report.info("Finished");
     ::std::process::exit(0);
 }

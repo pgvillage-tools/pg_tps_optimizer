@@ -1699,6 +1699,8 @@ dependencies = [
  "range_check",
  "rcgen",
  "regex",
+ "serde",
+ "serde_json",
  "shellexpand",
  "testcontainers-modules",
  "uzers",
