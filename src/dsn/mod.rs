@@ -33,6 +33,19 @@ fn error_chain(err: &dyn Error) -> String {
     message
 }
 
+// Unix socket directories to look for a running server when no host is set. libpq uses the one
+// directory it was built with: /var/run/postgresql on Debian/Ubuntu (and RHEL for newer
+// versions), /tmp for most other builds.
+const SOCKET_DIRS: [&str; 2] = ["/var/run/postgresql", "/tmp"];
+
+// The first directory with a socket for this port, or the last directory when none has one
+fn default_socket_dir(dirs: &[&str], port: &str) -> String {
+    dirs.iter()
+        .find(|dir| Path::new(dir).join(format!(".s.PGSQL.{}", port)).exists())
+        .unwrap_or(&dirs[dirs.len() - 1])
+        .to_string()
+}
+
 fn os_user_name() -> String {
     let mut user = generic::get_env_str("", "PGUSER", "").to_string();
     if user.is_empty() {
@@ -68,6 +81,12 @@ impl Dsn {
                 dsn.invalid.push(s.to_string())
             }
         }
+        // Without a host, look for the socket of the port from the connection string
+        let has_host = from.split(' ').any(|s| s.starts_with("host="));
+        if !has_host && std::env::var("PGHOST").is_err() {
+            let port = dsn.get_value("port", "5432");
+            dsn.set_value("host", &default_socket_dir(&SOCKET_DIRS, &port));
+        }
         dsn
     }
     pub fn cleanse(&self) -> Dsn {
@@ -94,14 +113,12 @@ impl Dsn {
             "dbname".to_string(),
             generic::get_env_str("", "PGDATABASE", os_user_name().as_str()),
         );
-        kv.insert(
-            "port".to_string(),
-            generic::get_env_str("", "PGPORT", "5432"),
-        );
+        let port = generic::get_env_str("", "PGPORT", "5432");
         kv.insert(
             "host".to_string(),
-            generic::get_env_str("", "PGHOST", "/tmp"),
+            generic::get_env_str("", "PGHOST", &default_socket_dir(&SOCKET_DIRS, &port)),
         );
+        kv.insert("port".to_string(), port);
         let ssl_mode = generic::get_env_str("", "PGSSLMODE", "prefer");
         kv.insert("sslmode".to_string(), ssl_mode.to_string());
         kv.insert(
@@ -301,6 +318,7 @@ impl Dsn {
 mod tests {
     use super::*;
     use postgres::Error;
+    use std::fs;
 
     #[test]
     fn test_new() {
@@ -348,8 +366,9 @@ mod tests {
         assert_eq!(
             d.cleanse().to_string(),
             format!(
-                "dbname='{0}' host='/tmp' password='' port='5432' user='{0}'",
-                os_user_name()
+                "dbname='{0}' host='{1}' password='' port='5432' user='{0}'",
+                os_user_name(),
+                default_socket_dir(&SOCKET_DIRS, "5432")
             )
         );
         let sslcert = generic::shell_exists("~/.postgresql/postgresql.crt");
@@ -360,7 +379,7 @@ mod tests {
             format!(
                 concat!(
                     "dbname='{0}' ",
-                    "host='/tmp' ",
+                    "host='{4}' ",
                     "password='' ",
                     "port='5432' ",
                     "sslcert='{1}' ",
@@ -372,7 +391,8 @@ mod tests {
                 os_user_name(),
                 sslcert,
                 sslkey,
-                sslrootcert
+                sslrootcert,
+                default_socket_dir(&SOCKET_DIRS, "5432")
             )
         );
         // And reset them to the value they had before runnignt his test
@@ -382,6 +402,26 @@ mod tests {
                 std::env::set_var(key, value);
             }
         }
+    }
+
+    #[test]
+    fn test_default_socket_dir() {
+        let base = std::env::temp_dir().join(format!("pg_tps_socket_dirs_{}", std::process::id()));
+        let (first, second) = (base.join("first"), base.join("second"));
+        fs::create_dir_all(&first).unwrap();
+        fs::create_dir_all(&second).unwrap();
+        let dirs = [first.to_str().unwrap(), second.to_str().unwrap()];
+
+        // No socket anywhere: the last directory
+        assert_eq!(default_socket_dir(&dirs, "5432"), dirs[1]);
+        // The first directory with a socket for the port
+        fs::write(second.join(".s.PGSQL.5432"), "").unwrap();
+        assert_eq!(default_socket_dir(&dirs, "5432"), dirs[1]);
+        fs::write(first.join(".s.PGSQL.5433"), "").unwrap();
+        assert_eq!(default_socket_dir(&dirs, "5433"), dirs[0]);
+        assert_eq!(default_socket_dir(&dirs, "5432"), dirs[1]);
+
+        fs::remove_dir_all(&base).unwrap();
     }
 
     #[test]
