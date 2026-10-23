@@ -41,6 +41,12 @@ hostssl all all 0.0.0.0/0 trust
 hostssl all all ::/0 trust
 ";
 
+// TLS and plain connections are both allowed (host matches both)
+const PG_HBA_TLS_AND_PLAIN: &str = "local all all trust
+host all all 0.0.0.0/0 trust
+host all all ::/0 trust
+";
+
 fn pg_version() -> String {
     std::env::var("PGVERSION").unwrap_or_else(|_| "18".to_string())
 }
@@ -536,4 +542,70 @@ fn runs_with_service_file() {
         "{}",
         run.describe()
     );
+}
+
+// Against a server that accepts both TLS and plain connections, prefer must use TLS, and allow
+// must not (it only uses TLS when a plain connection fails). PostgreSQL logs "SSL enabled" for
+// every authorized TLS connection.
+fn check_transport(name: &str, sslmode: &str, expect_tls: bool) {
+    let pg = start_postgres_with_tls(server_certs(), PG_HBA_TLS_AND_PLAIN);
+    let port = pg.get_host_port_ipv4(5432).unwrap().to_string();
+    // Log connections (set at runtime, so this admin connection isn't logged)
+    let mut admin = postgres::Client::connect(
+        &format!("host=localhost port={} user=postgres dbname=postgres", port),
+        postgres::NoTls,
+    )
+    .unwrap();
+    admin
+        .batch_execute("ALTER SYSTEM SET log_connections = 'on'")
+        .unwrap();
+    admin.batch_execute("SELECT pg_reload_conf()").unwrap();
+
+    let home = scratch_dir(name).join("home");
+    fs::create_dir_all(&home).unwrap();
+    run_pg_tps_optimizer(
+        &home,
+        &[
+            ("PGHOST", "localhost".to_string()),
+            ("PGPORT", port),
+            ("PGUSER", "postgres".to_string()),
+            ("PGDATABASE", "postgres".to_string()),
+            ("PGSSLMODE", sslmode.to_string()),
+        ],
+    )
+    .assert_success();
+
+    let log = String::from_utf8_lossy(&pg.stderr_to_vec().unwrap()).to_string();
+    let connections: Vec<&str> = log
+        .lines()
+        .filter(|line| line.contains("connection authorized"))
+        .collect();
+    // At least the sampler and one client
+    assert!(
+        connections.len() >= 2,
+        "too few connections in the log:\n{}",
+        log
+    );
+    for connection in connections {
+        assert_eq!(
+            connection.contains("SSL enabled"),
+            expect_tls,
+            "sslmode={}: expected TLS: {}, got: {}",
+            sslmode,
+            expect_tls,
+            connection
+        );
+    }
+}
+
+#[test]
+#[ignore = "requires a container runtime"]
+fn sslmode_prefer_uses_tls_when_possible() {
+    check_transport("sslmode_prefer_uses_tls_when_possible", "prefer", true);
+}
+
+#[test]
+#[ignore = "requires a container runtime"]
+fn sslmode_allow_uses_plain_when_possible() {
+    check_transport("sslmode_allow_uses_plain_when_possible", "allow", false);
 }
