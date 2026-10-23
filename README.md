@@ -1,3 +1,5 @@
+<img src="docs/assets/pg_tps_optimizer_logo.svg" alt="pg_tps_optimizer logo" width="120" align="right">
+
 # pg_tps_optimizer
 
 pg_tps_optimizer finds the number of clients that gives PostgreSQL the most transactions per second

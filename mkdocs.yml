@@ -9,6 +9,8 @@ edit_uri: edit/main/docs
 theme:
   name: material
   custom_dir: mkdocs_overrides
+  logo: assets/pg_tps_optimizer_logo.svg
+  favicon: assets/pg_tps_optimizer_logo.png
   language: en
   features:
     - content.action.edit
