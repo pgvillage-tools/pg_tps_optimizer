@@ -1,6 +1,7 @@
 on:
   release:
-    types: [created]
+    # Not created: that also fires when release-drafter saves a draft
+    types: [published]
   # Allows building all binaries manually (e.g. from a feature branch) without releasing
   workflow_dispatch:
 

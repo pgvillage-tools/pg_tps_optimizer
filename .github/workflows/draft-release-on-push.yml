@@ -1,0 +1,38 @@
+name: Draft release on push to main
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  # IMPORTANT: No checkout actions, scripts, or builds should be added to this workflow, as
+  # pull_request_target runs with a token that has write access.
+  pull_request_target:
+    types: [opened, reopened, synchronize, edited]
+
+permissions: {}
+
+jobs:
+  # Labels PRs (based on title and changed files), which release-drafter uses for categories
+  # and the next version
+  autolabel:
+    name: Label PR
+    if: github.event_name == 'pull_request_target'
+    permissions:
+      contents: read
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter/autolabeler@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
+
+  # Drafts the next release notes from the PRs merged into main
+  update_release_draft:
+    name: Update release draft
+    if: github.event_name != 'pull_request_target'
+    permissions:
+      # write permission is required to create a github release
+      contents: write
+      pull-requests: read
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@978bb0b30c5ee8cdd332ced253758157150d43f0 # v7.10.0
