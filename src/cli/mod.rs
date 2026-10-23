@@ -64,20 +64,22 @@ impl Params {
             self.prepared,
         )
     }
-    pub fn as_max_wait(&self) -> chrono::Duration {
-        match DurationString::from_string(self.max_wait.clone()) {
-            Ok(ds) => match chrono::Duration::from_std(ds.into()) {
-                Ok(duration) => duration,
-                Err(_) => panic!(
-                    "invalid value for max_wait: {} is not a Duration",
-                    self.max_wait
-                ),
-            },
-            Err(_) => panic!(
-                "invalid value for max_wait: {} is not a Duration",
+    // A duration like 10s, 1m30s or 500ms; a plain number means seconds
+    pub fn as_max_wait(&self) -> Result<chrono::Duration, String> {
+        let value = self.max_wait.trim();
+        let invalid = || {
+            format!(
+                "invalid value for max-wait: \"{}\" is not a duration (e.g. 10, 10s, 1m30s or 500ms)",
                 self.max_wait
-            ),
-        }
+            )
+        };
+        let duration: std::time::Duration = match value.parse::<u64>() {
+            Ok(seconds) => std::time::Duration::from_secs(seconds),
+            Err(_) => DurationString::from_string(value.to_string())
+                .map_err(|_| invalid())?
+                .into(),
+        };
+        chrono::Duration::from_std(duration).map_err(|_| invalid())
     }
     pub fn range_min_max(&self) -> (u32, u32) {
         let re = regex::Regex::new(r"\d+").unwrap();
@@ -89,6 +91,44 @@ impl Params {
             0 => (1, 1000),
             1 => (1, values[0]),
             _ => (values[0], values[values.len() - 1]),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn params_with_max_wait(max_wait: &str) -> Params {
+        Params {
+            dsn: String::new(),
+            query: String::new(),
+            prepared: false,
+            transactional: false,
+            range: String::new(),
+            spread: 0.0,
+            min_samples: 0,
+            max_wait: max_wait.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_as_max_wait() {
+        for (value, seconds) in [("3", 3), ("10s", 10), ("1m30s", 90), (" 5 ", 5)] {
+            assert_eq!(
+                params_with_max_wait(value).as_max_wait(),
+                Ok(chrono::Duration::seconds(seconds)),
+                "{}",
+                value
+            );
+        }
+        assert_eq!(
+            params_with_max_wait("500ms").as_max_wait(),
+            Ok(chrono::Duration::milliseconds(500))
+        );
+        for value in ["abc", "3x", "-1"] {
+            let err = params_with_max_wait(value).as_max_wait().unwrap_err();
+            assert!(err.contains("is not a duration"), "{}: {}", value, err);
         }
     }
 }
