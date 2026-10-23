@@ -330,10 +330,10 @@ sslmode_tests! {
     sslmode_verify_ca_with_tls: WithTls, "localhost", "verify-ca", Correct => Connects;
     sslmode_verify_full_with_tls: WithTls, "localhost", "verify-full", Correct => Connects;
 
-    // Root certificate that did not sign the server certificate. Like libpq, require behaves
-    // as verify-ca when a root certificate is configured.
+    // Root certificate that did not sign the server certificate: only verify-ca and verify-full
+    // check it (unlike libpq, require never checks the server certificate)
     sslmode_prefer_with_tls_wrong_ca: WithTls, "localhost", "prefer", Wrong => Connects;
-    sslmode_require_with_tls_wrong_ca: WithTls, "localhost", "require", Wrong => FailsCleanly;
+    sslmode_require_with_tls_wrong_ca: WithTls, "localhost", "require", Wrong => Connects;
     sslmode_verify_ca_with_tls_wrong_ca: WithTls, "localhost", "verify-ca", Wrong => FailsCleanly;
     sslmode_verify_full_with_tls_wrong_ca: WithTls, "localhost", "verify-full", Wrong => FailsCleanly;
 

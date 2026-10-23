@@ -23,8 +23,8 @@ pub struct PgSampler {
 }
 
 impl PgSampler {
-    pub fn new(dsn: Dsn) -> Result<PgSampler, Error> {
-        let mut client: Client = dsn.client().unwrap();
+    pub fn new(dsn: Dsn) -> Result<PgSampler, Box<dyn std::error::Error>> {
+        let mut client: Client = dsn.client()?;
         let statement: Statement = client.prepare(SAMPLE_QUERY)?;
         Ok(PgSampler {
             client,

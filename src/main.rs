@@ -13,7 +13,14 @@ mod threader;
 use crate::fibonacci::Fibonacci;
 use crate::threader::workload::Workload;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() {
+    if let Err(err) = run() {
+        eprintln!("error: {}", err);
+        ::std::process::exit(1);
+    }
+}
+
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Params::get_args();
 
     println!("Initializing");

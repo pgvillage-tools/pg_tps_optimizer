@@ -56,9 +56,11 @@ impl Consumer {
             thread_handle = thread::Builder::new()
                 .name(format!("worker {}", thread_id).to_string())
                 .spawn(move || {
-                    Worker::new(thread_id, upstream, thread_done, workload)
-                        .procedure()
-                        .unwrap();
+                    if let Err(err) =
+                        Worker::new(thread_id, upstream, thread_done, workload).procedure()
+                    {
+                        eprintln!("error: worker {}: {}", thread_id, err);
+                    }
                 })
                 .unwrap();
             self.threads.push(thread_handle);
