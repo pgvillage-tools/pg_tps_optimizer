@@ -19,6 +19,7 @@ more-asserts = "0.3.1"
 range_check = "0.2.0"
 home = "0.5.5"
 clap = { version = "4.6.7", features = ["derive", "env"] }
+libc = "0.2"
 
 [dev-dependencies]
 rcgen = "0.14.10"
