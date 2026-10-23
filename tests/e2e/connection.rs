@@ -142,3 +142,83 @@ fn runs_with_service_file() {
         run.describe()
     );
 }
+
+// Without a password, the password comes from the password file (~/.pgpass, PGPASSFILE or
+// passfile=), like libpq
+#[test]
+#[ignore = "requires a container runtime"]
+fn uses_password_file() {
+    use std::os::unix::fs::PermissionsExt;
+
+    // A server with password authentication (scram-sha-256), password "postgres"
+    let pg = Postgres::default()
+        .with_tag(pg_version())
+        .start()
+        .expect("could not start postgres container");
+    let port = pg.get_host_port_ipv4(5432).unwrap().to_string();
+    let dir = scratch_dir("uses_password_file");
+    let home = dir.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let write_passfile = |path: &Path, content: &str, mode: u32| {
+        fs::write(path, content).unwrap();
+        fs::set_permissions(path, fs::Permissions::from_mode(mode)).unwrap();
+    };
+    let env = |extra: &[(&'static str, String)]| {
+        let mut env = vec![
+            ("PGHOST", "localhost".to_string()),
+            ("PGPORT", port.clone()),
+            ("PGUSER", "postgres".to_string()),
+            ("PGDATABASE", "postgres".to_string()),
+            ("PGSSLMODE", "disable".to_string()),
+        ];
+        env.extend_from_slice(extra);
+        env
+    };
+
+    // ~/.pgpass
+    write_passfile(
+        &home.join(".pgpass"),
+        &format!(
+            "other:*:*:*:wrong\nlocalhost:{}:postgres:postgres:postgres\n",
+            port
+        ),
+        0o600,
+    );
+    run_pg_tps_optimizer(&home, &env(&[])).assert_success();
+
+    // ~/.pgpass that others can read is ignored, with a warning
+    fs::set_permissions(home.join(".pgpass"), fs::Permissions::from_mode(0o644)).unwrap();
+    let run = run_pg_tps_optimizer(&home, &env(&[]));
+    run.assert_clean_failure();
+    let stderr = String::from_utf8_lossy(&run.output.stderr).to_string();
+    assert!(
+        stderr.contains("has group or world access") && stderr.contains("password"),
+        "{}",
+        run.describe()
+    );
+    fs::remove_file(home.join(".pgpass")).unwrap();
+
+    // PGPASSFILE, with wildcards
+    let passfile = dir.join("passfile");
+    write_passfile(&passfile, "*:*:*:postgres:postgres\n", 0o600);
+    run_pg_tps_optimizer(
+        &home,
+        &env(&[("PGPASSFILE", passfile.display().to_string())]),
+    )
+    .assert_success();
+
+    // passfile= in the connection string
+    run_pg_tps_optimizer(
+        &home,
+        &env(&[("PGTPSSOURCE", format!("passfile={}", passfile.display()))]),
+    )
+    .assert_success();
+
+    // No matching line: the server rejects the connection
+    write_passfile(&passfile, "*:*:*:someone_else:postgres\n", 0o600);
+    run_pg_tps_optimizer(
+        &home,
+        &env(&[("PGPASSFILE", passfile.display().to_string())]),
+    )
+    .assert_clean_failure();
+}

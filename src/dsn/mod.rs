@@ -1,6 +1,7 @@
 use crate::generic;
 
 mod conninfo;
+mod passfile;
 mod service;
 
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
@@ -164,7 +165,12 @@ impl Dsn {
             }
         }
         pairs.extend(explicit.into_iter().filter(|(key, _)| key != "service"));
-        for (key, value) in &pairs {
+        let passfile_setting = pairs
+            .iter()
+            .rev()
+            .find(|(key, _)| key == "passfile")
+            .map(|(_, value)| value.to_string());
+        for (key, value) in pairs.iter().filter(|(key, _)| key != "passfile") {
             dsn.set_value(key, value);
         }
         let has = |name: &str| pairs.iter().any(|(key, _)| key == name);
@@ -190,6 +196,22 @@ impl Dsn {
                     dsn.ssl_mode
                 );
                 dsn.invalid.push(err);
+            }
+        }
+
+        // Without a password, look in the password file, for the first host and port
+        if dsn.get_value("password", "").is_empty() {
+            let host = dsn.get_value("host", "");
+            let port = dsn.get_value("port", "5432");
+            let target = passfile::Target {
+                host: host.split(',').next().unwrap_or(""),
+                port: port.split(',').next().unwrap_or("5432"),
+                dbname: &dsn.get_value("dbname", ""),
+                user: &dsn.get_value("user", ""),
+            };
+            let file = passfile::passfile(passfile_setting.as_deref());
+            if let Some(password) = passfile::lookup(&file, &target) {
+                dsn.set_value("password", &password);
             }
         }
         dsn
