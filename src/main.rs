@@ -12,6 +12,12 @@ use crate::fibonacci::Fibonacci;
 use crate::threader::workload::Workload;
 
 fn main() {
+    // Rust ignores SIGPIPE, so writing to a closed stdout (e.g. `pg_tps_optimizer | head`)
+    // panics. Restore the default, so the process stops quietly like other command line tools.
+    #[cfg(unix)]
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
     if let Err(err) = run() {
         eprintln!("error: {}", err);
         ::std::process::exit(1);
