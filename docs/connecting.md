@@ -117,6 +117,34 @@ docker run --rm \
   mannemsolutions/pg_tps_optimizer
 ```
 
+## Connection behaviour
+
+This table shows the result of every `sslmode` for different server setups. *Connects* means the
+benchmark runs; *fails* means pg_tps_optimizer stops with an error (see
+[When connecting fails](#when-connecting-fails)).
+
+| Server | Root certificate | Host | disable | allow | prefer | require | verify-ca | verify-full |
+|---|---|---|---|---|---|---|---|---|
+| without TLS | correct | localhost | ✅ connects | ✅ connects | ✅ connects | ❌ fails | ❌ fails | ❌ fails |
+| TLS only | correct | localhost | ❌ fails | ✅ connects | ✅ connects | ✅ connects | ✅ connects | ✅ connects |
+| TLS only | wrong CA | localhost | | | ✅ connects | ✅ connects ¹ | ❌ fails | ❌ fails |
+| TLS only | none | localhost | | | | ✅ connects | ❌ fails | ❌ fails |
+| TLS only | correct | 127.0.0.1 ² | | | | | ✅ connects | ❌ fails |
+
+- **Server without TLS:** `ssl = off` in `postgresql.conf`.
+- **TLS only:** `ssl = on`, and `pg_hba.conf` only has `hostssl` entries (no `host` or `hostnossl`),
+  so connections without TLS are rejected.
+- **Root certificate:** *correct* is the CA that signed the server certificate, *wrong CA* is a CA
+  that didn't, and *none* means no `sslrootcert` and no `~/.postgresql/root.crt`.
+- Empty cells are not tested; they behave like the *correct* root certificate row.
+
+¹ `require` never checks the server certificate. libpq checks the CA for `require` when a root
+certificate is configured; pg_tps_optimizer deliberately doesn't.
+² The server certificate is only valid for `localhost`, so only `verify-full` notices the mismatch.
+
+Every filled cell is covered by an end-to-end test in [`tests/e2e.rs`](../tests/e2e.rs), which runs
+pg_tps_optimizer against PostgreSQL in a container.
+
 ## When connecting fails
 
 When pg_tps_optimizer can't connect, it prints a single line starting with `error:` to stderr and
