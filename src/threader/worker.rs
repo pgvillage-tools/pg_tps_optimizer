@@ -1,6 +1,6 @@
 use crate::threader::sample::{ParallelSamples, Sample};
 use chrono::Utc;
-use postgres::Client;
+use postgres::{Client, Statement};
 use std::sync::mpsc;
 use std::thread;
 
@@ -51,6 +51,7 @@ impl Worker {
 
         //Sleep 100 milliseconds
         let mut client = self.initialize()?;
+        let mut statement = prepare(&mut client, &self.workload.w_type())?;
 
         loop {
             if let Ok(done) = self.done.read() {
@@ -61,6 +62,7 @@ impl Worker {
             }
             match sample(
                 &mut client,
+                statement.as_ref(),
                 self.workload.w_type(),
                 (tps / 10_f64) as u64,
                 self.id,
@@ -76,8 +78,17 @@ impl Worker {
                     println!("Error: {}", err);
                     let sleeptime = std::time::Duration::from_millis(100);
                     thread::sleep(sleeptime);
+                    // A prepared statement belongs to its connection, so prepare it again
                     match self.workload.client() {
-                        Ok(new_client) => client = new_client,
+                        Ok(mut new_client) => {
+                            match prepare(&mut new_client, &self.workload.w_type()) {
+                                Ok(new_statement) => {
+                                    client = new_client;
+                                    statement = new_statement;
+                                }
+                                Err(err) => eprintln!("error: worker {}: {}", self.id, err),
+                            }
+                        }
                         Err(err) => eprintln!("error: worker {}: {}", self.id, err),
                     }
                 }
@@ -87,8 +98,26 @@ impl Worker {
     }
 }
 
+fn update_query() -> String {
+    format!("update {} set id=$1 where id=$1", TABLE_NAME)
+}
+
+// Prepared workloads prepare the statement once per connection, and run it for every query
+fn prepare(
+    client: &mut Client,
+    w_type: &WorkloadType,
+) -> Result<Option<Statement>, postgres::Error> {
+    match w_type {
+        WorkloadType::Prepared | WorkloadType::PreparedTransactional => {
+            Ok(Some(client.prepare(&update_query())?))
+        }
+        WorkloadType::Default | WorkloadType::Transactional => Ok(None),
+    }
+}
+
 fn sample(
     client: &mut Client,
+    statement: Option<&Statement>,
     w_type: WorkloadType,
     mut num_queries: u64,
     thread_id: u32,
@@ -97,31 +126,25 @@ fn sample(
         num_queries = 1;
     }
     let mut s = Sample::new();
-    let query = format!("update {} set id=$1 where id=$1", TABLE_NAME);
+    let query = update_query();
 
     for _x in 0..num_queries {
         let start = Utc::now();
-        match w_type {
-            WorkloadType::Prepared => {
-                let prep = client.prepare(query.as_str())?;
-                client.query(&prep, &[&thread_id])?;
+        match (&w_type, statement) {
+            (WorkloadType::Prepared, Some(statement)) => {
+                client.query(statement, &[&thread_id])?;
             }
-            WorkloadType::Transactional => {
+            (WorkloadType::PreparedTransactional, Some(statement)) => {
                 let mut trans = client.transaction()?;
-                if !query.is_empty() {
-                    trans.query(query.as_str(), &[&thread_id])?;
-                }
+                trans.query(statement, &[&thread_id])?;
                 trans.commit()?;
             }
-            WorkloadType::PreparedTransactional => {
+            (WorkloadType::Transactional, _) => {
                 let mut trans = client.transaction()?;
-                if !query.is_empty() {
-                    let prep = trans.prepare(&query)?;
-                    let _row = trans.query(&prep, &[&thread_id]);
-                }
+                trans.query(query.as_str(), &[&thread_id])?;
                 trans.commit()?;
             }
-            WorkloadType::Default => {
+            _ => {
                 client.query(query.as_str(), &[&thread_id])?;
             }
         }
