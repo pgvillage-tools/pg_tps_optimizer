@@ -56,6 +56,20 @@ pub struct Params {
     #[arg(short, long, env = "PGTPSOUTPUT", value_enum, default_value_t = Format::Table)]
     pub output: Format,
 
+    /// write a PNG graph of the TPS per number of clients to this file
+    #[arg(short, long, env = "PGTPSGRAPH")]
+    pub graph: Option<PathBuf>,
+
+    /// instead of running, draw the graph of these JSON reports (from --output json), one line per
+    /// report; repeat (or separate with commas) for more reports
+    #[arg(
+        long,
+        env = "PGTPSGRAPHINPUT",
+        value_delimiter = ',',
+        requires = "graph"
+    )]
+    pub graph_input: Vec<PathBuf>,
+
     /// a YAML config file with a value per option, like `range: 1:200`; options on the command
     /// line and environment variables win over the config file
     #[arg(short, long, env = "PGTPSCONFIG")]
@@ -170,6 +184,8 @@ mod tests {
             output: Format::Table,
 
             config: None,
+            graph: None,
+            graph_input: Vec::new(),
         }
     }
 

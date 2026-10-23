@@ -25,8 +25,37 @@ fn main() {
     }
 }
 
+// A line in the graph per JSON report (from --output json), named after the file
+fn load_series(
+    path: &std::path::Path,
+) -> Result<output::graph::Series, Box<dyn std::error::Error>> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|e| format!("could not read \"{}\": {}", path.display(), e))?;
+    let report: output::JsonSteps = serde_json::from_str(&content)
+        .map_err(|e| format!("\"{}\" is not a JSON report: {}", path.display(), e))?;
+    Ok(output::graph::Series {
+        name: path
+            .file_stem()
+            .map(|stem| stem.to_string_lossy().to_string())
+            .unwrap_or_default(),
+        steps: report.steps,
+    })
+}
+
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let args = cli::Params::get_args();
+
+    // Only draw the graph of earlier runs, without running
+    if let (Some(graph), false) = (&args.graph, args.graph_input.is_empty()) {
+        let series = args
+            .graph_input
+            .iter()
+            .map(|path| load_series(path))
+            .collect::<Result<Vec<_>, _>>()?;
+        output::graph::draw(graph, &series)?;
+        eprintln!("Wrote graph to {}", graph.display());
+        return Ok(());
+    }
 
     // Validate before connecting
     let max_wait: chrono::Duration = args.as_max_wait()?;
@@ -88,6 +117,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
     report.finish()?;
+    if let Some(graph) = &args.graph {
+        let series = output::graph::Series {
+            name: "TPS".to_string(),
+            steps: report.steps().to_vec(),
+        };
+        output::graph::draw(graph, &[series])?;
+        report.info(&format!("Wrote graph to {}", graph.display()));
+    }
 
     report.info("Stopping, but lets give the threads some time to stop");
     threader.finish();

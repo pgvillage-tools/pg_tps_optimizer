@@ -1,6 +1,8 @@
 // Reports the results of a run, as a table (printed while running) or as JSON (printed at the end)
 use clap::ValueEnum;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
+
+pub mod graph;
 
 #[derive(Clone, Copy, Debug, PartialEq, ValueEnum)]
 pub enum Format {
@@ -21,7 +23,7 @@ pub struct Settings {
 
 // The results of one step (number of clients). The measurements are missing (null in JSON) when
 // the step got no samples at all.
-#[derive(Clone, Serialize)]
+#[derive(Clone, Deserialize, Serialize)]
 pub struct Step {
     pub timestamp: String,
     pub clients: u32,
@@ -40,6 +42,12 @@ struct JsonReport<'a> {
     steps: &'a [Step],
 }
 
+// The steps of a JSON report (from --output json), to draw a graph of
+#[derive(Deserialize)]
+pub struct JsonSteps {
+    pub steps: Vec<Step>,
+}
+
 pub struct Report {
     format: Format,
     settings: Settings,
@@ -53,6 +61,10 @@ impl Report {
             settings,
             steps: Vec::new(),
         }
+    }
+
+    pub fn steps(&self) -> &[Step] {
+        &self.steps
     }
 
     // Progress messages go to stdout with the table, and to stderr with JSON, so stdout only has

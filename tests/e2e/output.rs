@@ -42,3 +42,29 @@ fn outputs_json() {
     // The progress messages go to stderr
     assert!(String::from_utf8_lossy(&run.output.stderr).contains("Finished"));
 }
+
+// --graph writes a PNG with the TPS per number of clients of the run
+#[test]
+#[ignore = "requires a container runtime"]
+fn writes_graph() {
+    let pg = start_postgres();
+    let dir = scratch_dir("writes_graph");
+    let home = dir.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let graph = dir.join("graph.png");
+    run_pg_tps_optimizer(
+        &home,
+        &[
+            ("PGHOST", "localhost".to_string()),
+            ("PGPORT", pg.get_host_port_ipv4(5432).unwrap().to_string()),
+            ("PGUSER", "postgres".to_string()),
+            ("PGDATABASE", "postgres".to_string()),
+            ("PGSSLMODE", "disable".to_string()),
+            ("PGTPSRANGE", "1:4".to_string()),
+            ("PGTPSGRAPH", graph.display().to_string()),
+        ],
+    )
+    .assert_success();
+    let png = fs::read(&graph).unwrap();
+    assert_eq!(&png[1..4], b"PNG");
+}
