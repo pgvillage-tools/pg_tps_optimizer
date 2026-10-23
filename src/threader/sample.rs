@@ -67,7 +67,7 @@ fn div_duration(d: Duration, x: u64) -> Duration {
         Duration::zero()
     } else if x > MAX_U32 {
         match i32::try_from(x.sqrt()).ok() {
-            Some(rt) => return d / rt,
+            Some(rt) => d / rt,
             None => panic!("that is some unexpected divisor: {}", x),
         }
     } else {
@@ -96,7 +96,7 @@ impl Sample {
     // add a transaction (with the duration of it)
     pub fn increment(&mut self, wait: Duration) {
         self.transactions += 1;
-        self.wait = self.wait + wait;
+        self.wait += wait;
     }
     // stop sampling
     pub fn end(&mut self) {
@@ -174,8 +174,8 @@ impl ParallelSample {
             return Err("trying to combine samples of different timeslices");
         }
         self.total_transactions += samples.total_transactions;
-        self.total_waits = self.total_waits + samples.total_waits;
-        self.total_duration = self.total_duration + samples.total_duration;
+        self.total_waits += samples.total_waits;
+        self.total_duration += samples.total_duration;
         self.num_samples += samples.num_samples;
         Ok(())
     }
@@ -323,7 +323,7 @@ impl TestResults {
         let mut num: u64 = 0;
         let mut tot_lat = Duration::zero();
         for tr in self.results.clone() {
-            tot_lat = tot_lat + tr.latency;
+            tot_lat += tr.latency;
             num += 1
         }
         match num {
@@ -462,7 +462,7 @@ mod tests {
         for slice in from_ts..(from_ts + num_ts as u32) {
             ps.timeslice = slice;
             ps.num_samples += increase;
-            pps.add(ps.clone());
+            pps.add(ps);
         }
         pps
     }
@@ -470,7 +470,7 @@ mod tests {
         if first == 0.0 {
             return 0.0;
         }
-        return 100.0 * second / first;
+        100.0 * second / first
     }
     #[test]
     fn test_percent_of() {
@@ -484,7 +484,7 @@ mod tests {
     #[test]
     fn test_sample() {
         let sample = create_test_sample(NUM_TRANSACTIONS, Duration::milliseconds(WAIT_MS));
-        let s_tps = sample.clone().tps();
+        let s_tps = sample.tps();
         assert!(s_tps < 180_f64);
 
         let ms = sample.to_parallel_sample();
@@ -495,7 +495,7 @@ mod tests {
     fn test_parallel_sample() {
         let sample = create_test_sample(NUM_TRANSACTIONS, Duration::milliseconds(WAIT_MS));
         let ps = create_test_parasample(sample, NUM_THREADS);
-        let mut other = ps.clone();
+        let mut other = ps;
         other.timeslice += 1;
         assert_eq!(
             other.add(ps).unwrap_err(),
@@ -515,7 +515,7 @@ mod tests {
         let ps = create_test_parasample(sample, NUM_THREADS);
         let mut pss = ParallelSamples::new();
         pss.add(ps);
-        let mut other = ps.clone();
+        let mut other = ps;
         let mut other_pss = ParallelSamples::new();
         other_pss.add(other);
         for i in 1..101 {
@@ -566,7 +566,7 @@ mod tests {
         let stdev = results.std_deviation_absolute().unwrap();
         println!("stdev: {} {}", stdev.tps, stdev.latency.num_milliseconds());
         assert!(results.verify(5.0).is_some());
-        let mean = results.mean().unwrap().clone();
+        let mean = results.mean().unwrap();
         percent = percent_of(mean.tps, expected_tps);
         assert_eq!(percent.check_range(90.0..110.0), Ok(percent));
         percent = percent_of(

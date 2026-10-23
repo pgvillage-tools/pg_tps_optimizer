@@ -73,7 +73,7 @@ impl Worker {
                     tps = sample.tps();
                 }
                 Err(err) => {
-                    println!("Error: {}", &err);
+                    println!("Error: {}", err);
                     let sleeptime = std::time::Duration::from_millis(100);
                     thread::sleep(sleeptime);
                     client = self.workload.client();

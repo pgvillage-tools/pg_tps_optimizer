@@ -19,7 +19,7 @@ jobs:
       #  if: runner.os == 'Windows'
       #- run: vcpkg install openssl:x64-windows-static-md
       #  if: runner.os == 'Windows'
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v5
       - name: Set version
         run: ./set_version.sh
       - name: Compile and release
@@ -35,7 +35,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Set version
         run: ./set_version.sh

@@ -1,0 +1,108 @@
+name: CI run on PR
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+# A new push to a PR cancels the CI run that is still running for the previous push
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  codechanges:
+    runs-on: ubuntu-latest
+    outputs:
+      rust: ${{ steps.filter.outputs.rust_any_changed }}
+      e2e: ${{ steps.filter.outputs.e2e_any_changed }}
+      ci: ${{ steps.filter.outputs.ci_any_changed }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
+        id: filter
+        with:
+          # rust: anything that changes how the crate builds, lints or tests
+          # e2e: rust changes, or changes to the docker compose test setup
+          # ci: run everything when this workflow changes, to validate it is working
+          files_yaml: |
+            rust:
+              - 'src/**'
+              - 'tests/**'
+              - 'build.rs'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.cargo/**'
+              - 'rust-toolchain'
+              - 'rust-toolchain.toml'
+              - '**/clippy.toml'
+              - '**/rustfmt.toml'
+            e2e:
+              - 'src/**'
+              - 'tests/**'
+              - 'build.rs'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - '.cargo/**'
+              - 'Dockerfile'
+              - 'docker-compose.yml'
+              - 'docker-compose-tests.sh'
+              - 'config/**'
+            ci:
+              - '.github/workflows/ci-run-on-pr.yaml'
+
+  lint:
+    name: Rustfmt and Clippy
+    runs-on: ubuntu-latest
+    needs:
+      - codechanges
+    if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      # rustfmt needs no compilation, so fail fast before building anything
+      - name: Run cargo fmt
+        run: cargo fmt --all -- --check
+      - uses: Swatinem/rust-cache@v2
+      # clippy also does everything `cargo check` does
+      - name: Run cargo clippy
+        run: cargo clippy -- -D warnings
+
+  unit-test:
+    name: Run unit tests
+    runs-on: ubuntu-latest
+    needs:
+      - codechanges
+    if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Run cargo test
+        run: cargo test
+
+  e2e-test:
+    name: Run e2e tests (docker compose)
+    runs-on: ubuntu-latest
+    needs:
+      - codechanges
+      - unit-test
+    # Also run when unit-test was skipped (only docker/compose files changed), but not when it failed
+    if: ${{ !cancelled() && !failure() && (needs.codechanges.outputs.e2e == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: update to docker-compose v2
+        run: |
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.3.3/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+          docker-compose --version
+      - name: docker-compose-tests.sh
+        run: ./docker-compose-tests.sh
