@@ -34,7 +34,8 @@ impl PgSampler {
         })
     }
     pub fn next(&mut self) -> Result<(), Error> {
-        let rows = self.client.query(&self.statement, &[&self.previous.lsn])?;
+        // The WAL written since the latest sample, which becomes the previous one
+        let rows = self.client.query(&self.statement, &[&self.latest.lsn])?;
         assert_eq!(rows.len(), 1);
         let row = rows.first().unwrap();
         self.previous = self.latest.clone();
@@ -52,16 +53,20 @@ impl PgSampler {
             .unwrap() as f32
             / 1.0e+9_f32
     }
+    // kB of WAL written per second between the previous and the latest sample
     pub fn wal_per_sec(&self) -> f32 {
-        let wps = (self.latest.wal_bytes - self.previous.wal_bytes) / self.duration();
-        if wps < 0.0 {
-            return -1.0;
-        }
-        wps
+        wal_kb_per_sec(&self.latest, self.duration())
     }
     pub fn tps(&self) -> f32 {
         (self.latest.num_transactions - self.previous.num_transactions) / self.duration()
     }
+}
+
+fn wal_kb_per_sec(latest: &TransactDataSample, seconds: f32) -> f32 {
+    if seconds <= 0.0 || latest.wal_bytes < 0.0 {
+        return -1.0;
+    }
+    latest.wal_bytes / 1024.0 / seconds
 }
 
 struct TransactDataSample {
@@ -87,5 +92,25 @@ impl TransactDataSample {
             wal_bytes: self.wal_bytes,
             num_transactions: self.num_transactions,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_with_wal(wal_bytes: f32) -> TransactDataSample {
+        let mut sample = TransactDataSample::new();
+        sample.wal_bytes = wal_bytes;
+        sample
+    }
+
+    #[test]
+    fn test_wal_kb_per_sec() {
+        // wal_bytes is the WAL written since the previous sample
+        assert_eq!(wal_kb_per_sec(&sample_with_wal(2048.0), 2.0), 1.0);
+        assert_eq!(wal_kb_per_sec(&sample_with_wal(0.0), 2.0), 0.0);
+        assert_eq!(wal_kb_per_sec(&sample_with_wal(1024.0), 0.0), -1.0);
+        assert_eq!(wal_kb_per_sec(&sample_with_wal(-1.0), 1.0), -1.0);
     }
 }
