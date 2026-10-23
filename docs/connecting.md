@@ -17,7 +17,7 @@ Connection settings come from three places. Later sources override earlier ones:
 
 | Setting | Environment variable | Default |
 |---|---|---|
-| `host` | `PGHOST` | `/tmp` (unix socket) |
+| `host` | `PGHOST` | the unix socket directory with a running server for `port`: `/var/run/postgresql` or `/tmp` (`/tmp` when neither has one) |
 | `port` | `PGPORT` | `5432` |
 | `user` | `PGUSER` | the current OS user |
 | `dbname` | `PGDATABASE` | the user name |

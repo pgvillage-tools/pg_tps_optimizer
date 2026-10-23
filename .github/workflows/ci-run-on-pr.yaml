@@ -88,13 +88,17 @@ jobs:
         run: cargo test
 
   e2e-test:
-    name: Run e2e tests (testcontainers)
+    name: Run e2e tests (PostgreSQL ${{ matrix.pgversion }})
     runs-on: ubuntu-latest
     # Only run after unit tests passed
     needs:
       - codechanges
       - unit-test
     if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    strategy:
+      fail-fast: false
+      matrix:
+        pgversion: ['14', '15', '16', '17', '18']
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -104,6 +108,24 @@ jobs:
       # The e2e tests start their own PostgreSQL containers on the runner's docker
       - name: Run e2e tests
         run: cargo test --test e2e -- --ignored
+        env:
+          PGVERSION: ${{ matrix.pgversion }}
+
+  # One check for all PostgreSQL versions, to require in branch protection. It passes when all
+  # versions passed, or when the e2e tests were skipped (no Rust changes, or draft PR).
+  e2e-test-status:
+    name: Run e2e tests (testcontainers)
+    runs-on: ubuntu-latest
+    needs:
+      - e2e-test
+    if: always()
+    steps:
+      - name: Check e2e results
+        env:
+          RESULT: ${{ needs.e2e-test.result }}
+        run: |
+          echo "e2e result: ${RESULT}"
+          [ "${RESULT}" = "success" ] || [ "${RESULT}" = "skipped" ]
 
   docker-build:
     name: Build docker image (${{ matrix.platform }})
