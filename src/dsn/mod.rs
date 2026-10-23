@@ -13,6 +13,8 @@ use uzers::{get_current_uid, get_user_by_uid};
 pub struct Dsn {
     kv: HashMap<String, String>,
     ssl_mode: String,
+    // Parts of the connection string that are not key=value, reported when connecting
+    invalid: Vec<String>,
 }
 
 // The postgres crate keeps the details (like the server message) in the error source, so add
@@ -61,6 +63,8 @@ impl Dsn {
         for s in split {
             if let Some((key, value)) = s.split_once('=') {
                 dsn.set_value(key, value)
+            } else if !s.is_empty() {
+                dsn.invalid.push(s.to_string())
             }
         }
         dsn
@@ -75,7 +79,11 @@ impl Dsn {
         // sslcrl is not supported (yet), ignore it so a DSN that sets it can still connect
         kv.remove("sslcrl");
         let ssl_mode = "disable".to_string();
-        Dsn { kv, ssl_mode }
+        Dsn {
+            kv,
+            ssl_mode,
+            invalid: self.invalid.clone(),
+        }
     }
     pub fn new() -> Dsn {
         let mut kv: HashMap<String, String> = HashMap::new();
@@ -113,7 +121,11 @@ impl Dsn {
             // So, for empty [assword we use a string containing just a letter p
             generic::get_env_str("", "PGPASSWORD", ""),
         );
-        Dsn { kv, ssl_mode }
+        Dsn {
+            kv,
+            ssl_mode,
+            invalid: Vec::new(),
+        }
     }
     pub fn debug(&self) -> String {
         let mut vec = Vec::new();
@@ -160,7 +172,18 @@ impl Dsn {
     // disable, prefer and require, so allow, verify-ca and verify-full are built from those, and
     // the certificate checks are configured on the TLS connector.
     pub fn client(&self) -> Result<Client, Box<dyn Error>> {
-        let mut config: Config = self.cleanse().to_string().parse()?;
+        if let Some(part) = self.invalid.first() {
+            return Err(format!(
+                "invalid connection string: \"{}\" is not a key=value pair (URLs are not supported)",
+                part
+            )
+            .into());
+        }
+        let mut config: Config = self
+            .cleanse()
+            .to_string()
+            .parse()
+            .map_err(|e: postgres::Error| error_chain(&e))?;
         // Like libpq, sslmode is ignored for unix sockets
         let ssl_mode = match self.get_value("host", "").starts_with('/') {
             true => "disable",
@@ -326,6 +349,23 @@ mod tests {
                 std::env::set_var(key, value);
             }
         }
+    }
+
+    #[test]
+    fn test_invalid_connection_string() {
+        let err = Dsn::from_string("postgresql://user@host/db")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("is not a key=value pair"), "{}", err);
+
+        let err = Dsn::from_string("host=/tmp unknown_key=value")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("unknown option `unknown_key`"), "{}", err);
     }
 
     #[test]
