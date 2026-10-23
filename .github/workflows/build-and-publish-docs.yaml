@@ -2,6 +2,7 @@ name: Build and publish documentation
 
 # Publishes the docs with mike to the gh-pages branch, which GitHub Pages serves:
 # - a release publishes version X.Y.x (for tag vX.Y.Z), and moves the `latest` alias to it
+# - a pre-release publishes its own version (for tag vX.Y.Z-rc1: X.Y.Z-rc1), without `latest`
 # - a manual run publishes the selected branch as version `dev`
 on:
   release:
@@ -10,10 +11,12 @@ on:
 
 permissions: {}
 
-# Runs push to the same gh-pages branch, so never run two at the same time
+# Runs push to the same gh-pages branch, so never run two at the same time. Queue all pending runs
+# (instead of only the last one), so every release gets its documentation version.
 concurrency:
   group: publish-docs
   cancel-in-progress: false
+  queue: max
 
 jobs:
   publish:
@@ -50,7 +53,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
 
       - name: Publish release documentation
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' && !github.event.release.prerelease
         env:
           TAG: ${{ github.event.release.tag_name }}
         run: |
@@ -58,6 +61,13 @@ jobs:
           VERSION="$(echo "${TAG#v}" | sed -E 's/^([0-9]+\.[0-9]+).*/\1.x/')"
           mike deploy --push --update-aliases "${VERSION}" latest
           mike set-default --push latest
+
+      # A pre-release must not replace the documentation of the latest stable release
+      - name: Publish pre-release documentation
+        if: github.event_name == 'release' && github.event.release.prerelease
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: mike deploy --push "${TAG#v}"
 
       - name: Publish development documentation
         if: github.event_name == 'workflow_dispatch'
