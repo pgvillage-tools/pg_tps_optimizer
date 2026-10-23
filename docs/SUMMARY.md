@@ -1,0 +1,12 @@
+- [Home](index.md)
+- User guide
+    - [Installation](users-guide/installation.md)
+    - [Usage](users-guide/usage.md)
+    - [Reading the results](users-guide/results.md)
+    - [Connecting to PostgreSQL](users-guide/connecting.md)
+- Developer guide
+    - [Building](developers-guide/building.md)
+    - [Testing](developers-guide/testing.md)
+    - [Releasing](developers-guide/releasing.md)
+- About
+    - [License](about/license.md)
