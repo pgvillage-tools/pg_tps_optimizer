@@ -15,7 +15,7 @@ updates:
       cargo-minor-patch:
         update-types: ["minor", "patch"]
     commit-message:
-      prefix: "deps(cargo)"
+      prefix: "chore(deps)"
     labels: ["dependencies", "rust"]
 
   # Actions used in .github/workflows
@@ -27,7 +27,7 @@ updates:
       github-actions:
         patterns: ["*"]
     commit-message:
-      prefix: "deps(actions)"
+      prefix: "ci(deps)"
     labels: ["dependencies", "github-actions"]
 
   # Base images in Containerfile (rust, debian)
@@ -36,5 +36,5 @@ updates:
     schedule:
       interval: "monthly"
     commit-message:
-      prefix: "deps(docker)"
+      prefix: "build(deps)"
     labels: ["dependencies", "docker"]
