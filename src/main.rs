@@ -1,6 +1,4 @@
-extern crate args;
 extern crate chrono;
-extern crate getopts;
 extern crate postgres;
 
 mod cli;
