@@ -1,0 +1,4 @@
+# Keep the build context small: the image builds from the sources only
+.git
+.claude
+target
