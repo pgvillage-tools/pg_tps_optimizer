@@ -24,6 +24,8 @@ audittest:
 checkmate:
 	cargo checkmate
 
+.PHONY: build-linux build-darwin build-all
+
 # Cross builds; linux targets need `cargo install cross` and a running docker,
 # darwin targets need to be built on macOS (`rustup target add <target>`)
 LINUX_TARGETS = x86_64-unknown-linux-musl aarch64-unknown-linux-musl

@@ -8,6 +8,11 @@ if [ -z "${VERSION}" ]; then
 fi
 VERSION=$(echo $VERSION | sed 's/[^0-9.]//g')
 if [ -z "${VERSION}" ]; then
+  # A release tag must give a version, untagged (manual) builds may skip it
+  if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+    echo "Tag ${GITHUB_REF#refs/tags/} does not contain a version" >&2
+    exit 1
+  fi
   echo "Could not determine version, leaving Cargo.toml as is"
   exit 0
 fi
