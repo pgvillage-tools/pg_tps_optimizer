@@ -1693,6 +1693,7 @@ dependencies = [
  "num",
  "num-traits",
  "openssl",
+ "openssl-probe",
  "postgres",
  "postgres-openssl",
  "range_check",
