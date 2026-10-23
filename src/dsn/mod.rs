@@ -205,11 +205,11 @@ mod tests {
 
         // Lets test with these set
         let mut d = Dsn::new();
-        assert_eq!(d.use_tls(), false);
-        assert_eq!(d.verify_hostname(), false);
+        assert!(!d.use_tls());
+        assert!(!d.verify_hostname());
         d.set_value("sslmode", "verify-full");
-        assert_eq!(d.use_tls(), true);
-        assert_eq!(d.verify_hostname(), true);
+        assert!(d.use_tls());
+        assert!(d.verify_hostname());
         let home_dir = home::home_dir().unwrap().display().to_string();
         let expected = concat!(
             "dbname='there' ",
@@ -225,16 +225,16 @@ mod tests {
         );
         assert_eq!(d.to_string(), expected.replace("~", home_dir.as_str()),);
         // and unset them
-        for (key, _) in envvars.iter() {
+        for key in envvars.keys() {
             std::env::remove_var(key);
         }
         // And test without them being set
         d = Dsn::new();
-        assert_eq!(d.use_tls(), true);
+        assert!(d.use_tls());
         assert_eq!(
             d.cleanse().to_string(),
             format!(
-                concat!("dbname='{0}' host='/tmp' password='' port='5432' user='{0}'"),
+                "dbname='{0}' host='/tmp' password='' port='5432' user='{0}'",
                 os_user_name()
             )
         );
@@ -277,7 +277,7 @@ mod tests {
     #[ignore]
     fn test_dsn_client() -> Result<(), Error> {
         let constr = generic::get_env_str("", "TEST_CONNSTR", "").to_string();
-        if constr == "" {
+        if constr.is_empty() {
             return Ok(());
         }
         let dsn = Dsn::from_string(constr.as_str());

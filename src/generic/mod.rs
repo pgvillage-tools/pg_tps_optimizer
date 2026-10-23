@@ -118,7 +118,7 @@ mod tests {
         const TEST_VAL: &str = "is set";
         env::set_var(TEST_VAR, TEST_VAL);
         for val in [true, false] {
-            assert_eq!(get_env_bool(val, TEST_VAR), true);
+            assert!(get_env_bool(val, TEST_VAR));
         }
         env::remove_var(TEST_VAR);
         for val in [true, false] {
