@@ -22,7 +22,7 @@ jobs:
       e2e: ${{ steps.filter.outputs.e2e_any_changed }}
       ci: ${{ steps.filter.outputs.ci_any_changed }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
         id: filter
         with:
@@ -62,7 +62,7 @@ jobs:
       - codechanges
     if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -81,7 +81,7 @@ jobs:
       - codechanges
     if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run cargo test
@@ -96,7 +96,7 @@ jobs:
     # Also run when unit-test was skipped (only docker/compose files changed), but not when it failed
     if: ${{ !cancelled() && !failure() && (needs.codechanges.outputs.e2e == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: update to docker-compose v2
