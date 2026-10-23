@@ -75,7 +75,7 @@ impl Worker {
                     tps = sample.tps();
                 }
                 Err(err) => {
-                    println!("Error: {}", err);
+                    eprintln!("error: worker {}: {}", self.id, err);
                     let sleeptime = std::time::Duration::from_millis(100);
                     thread::sleep(sleeptime);
                     // A prepared statement belongs to its connection, so prepare it again
