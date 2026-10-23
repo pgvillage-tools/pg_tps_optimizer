@@ -29,18 +29,32 @@ Connection settings come from three places. Later sources override earlier ones:
 
 ### Connection string format
 
-The connection string is a space separated list of `key=value` pairs, for example:
+The connection string uses the same formats as libpq: `key=value` pairs, or a URI.
 
 ```
 pg_tps_optimizer --dsn 'host=db1.example.com port=5432 user=postgres dbname=postgres sslmode=verify-full'
+pg_tps_optimizer --dsn 'postgresql://postgres@db1.example.com:5432/postgres?sslmode=verify-full'
 ```
 
-Keep in mind:
+`key=value` pairs:
 
-- Values can't be quoted and can't contain spaces.
-- URLs (`postgresql://...`) are not supported.
-- `~` is only expanded in environment variables. Use absolute paths for certificate files in the
-  connection string.
+- Are separated by whitespace; whitespace around `=` is allowed.
+- Values with spaces must be quoted with single quotes: `application_name='pg tps'`. Within a
+  value, a backslash escapes the next character: `'it\'s'`.
+- An empty value must be quoted as well (`password=''`): `password= user=x` sets the password to
+  `user=x`, like in libpq.
+
+URIs (`postgresql://` or `postgres://`):
+
+- `postgresql://[user[:password]@][host[:port][,host[:port]...]][/dbname][?key=value[&...]]`
+- Every part is optional, and `?key=value` accepts any connection setting, like
+  `?sslmode=verify-full&sslrootcert=/etc/pg/root.crt`.
+- IPv6 addresses go in brackets (`[::1]:5432`), and special characters must be percent-encoded,
+  e.g. `%40` for `@` in a password, or `%2Fvar%2Frun%2Fpostgresql` for a unix socket directory as
+  host.
+
+In both formats, `~` is not expanded (only in environment variables): use absolute paths for
+certificate files.
 
 ### Not supported
 
@@ -182,7 +196,7 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `root certificate file ... does not exist` | `sslmode=verify-*` without a root certificate |
 | `sslkey is set, but sslcert is not` (or the other way around) | only one of the client certificate and key is configured, or only one of the default files in `~/.postgresql` exists |
 | `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |
-| `invalid connection string` | the connection string has an unknown key (for instance `client_encoding`) or something that is not a `key=value` pair (for instance a URL) |
+| `invalid connection string` | the connection string can't be parsed (for instance an unterminated quote, or a key without `=`), or has an unknown key (for instance `client_encoding`) |
 | `Connection refused` | wrong host or port, or PostgreSQL isn't running |
 
 All errors currently use exit code 1. Separate exit codes per kind of error are planned in
