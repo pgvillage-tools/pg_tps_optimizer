@@ -44,7 +44,7 @@ jobs:
               - '**/clippy.toml'
               - '**/rustfmt.toml'
             docker:
-              - 'Dockerfile'
+              - 'Containerfile'
               - '.dockerignore'
               - 'Cargo.toml'
               - 'Cargo.lock'
@@ -131,6 +131,7 @@ jobs:
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: .
+          file: Containerfile
           platforms: ${{ matrix.platform }}
           push: false
           load: true
