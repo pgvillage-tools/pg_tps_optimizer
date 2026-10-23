@@ -7,7 +7,7 @@ edition = "2018"
 [dependencies]
 # Keep sorted, so dependencies added in parallel PRs land on different lines
 chrono = "0.4.24"
-clap = { version = "4.6.7", features = ["derive", "env"] }
+clap = { version = "4.6.7", features = ["derive", "env", "string"] }
 duration-string = "0.5.3"
 home = "0.5.5"
 libc = "0.2"
@@ -21,6 +21,7 @@ postgres-openssl = "0.5.0"
 range_check = "0.2.0"
 regex = "1"
 serde = { version = "1.0.229", features = ["derive"] }
+serde-saphyr = { version = "2.0.0", default-features = false, features = ["deserialize"] }
 serde_json = "1.0.154"
 shellexpand = "3.1.2"
 uzers = "0.12.2"

@@ -14,12 +14,14 @@
 //! The tests are split per subject; add tests for a new feature in its own module, so parallel
 //! changes don't touch the same file:
 //! - common: helpers (certificates, PostgreSQL containers, running the binary)
+//! - config: the config file
 //! - sslmode: sslmode, TLS and certificates
 //! - connection: connection strings, environment variables, service files
 //! - output: output formats (JSON, graph)
 //! - workload: transactional and prepared modes
 
 mod common;
+mod config;
 mod connection;
 mod output;
 mod sslmode;

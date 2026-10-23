@@ -1,8 +1,11 @@
 use crate::dsn::Dsn;
 use crate::output::Format;
 use crate::threader::workload::Workload;
-use clap::Parser;
+use clap::{CommandFactory, FromArgMatches, Parser};
 use duration_string::DurationString;
+use std::path::PathBuf;
+
+mod config;
 
 // Every option can also be set with an environment variable. An option on the command line wins
 // over the environment variable, which wins over the default.
@@ -52,11 +55,61 @@ pub struct Params {
     /// output format: a table while running, or a JSON document at the end
     #[arg(short, long, env = "PGTPSOUTPUT", value_enum, default_value_t = Format::Table)]
     pub output: Format,
+
+    /// a YAML config file with a value per option, like `range: 1:200`; options on the command
+    /// line and environment variables win over the config file
+    #[arg(short, long, env = "PGTPSCONFIG")]
+    pub config: Option<PathBuf>,
+}
+
+// The config file, from -c/--config or PGTPSCONFIG. Found before parsing the options, as its
+// values are the defaults of the other options (also in --help).
+fn config_path(args: impl Iterator<Item = String>) -> Option<PathBuf> {
+    let mut args = args.peekable();
+    let mut path = None;
+    while let Some(arg) = args.next() {
+        if arg == "--" {
+            break;
+        } else if arg == "-c" || arg == "--config" {
+            path = args.next();
+        } else if let Some(value) = arg.strip_prefix("--config=") {
+            path = Some(value.to_string());
+        } else if let Some(value) = arg.strip_prefix("-c").filter(|v| !v.is_empty()) {
+            path = Some(value.trim_start_matches('=').to_string());
+        }
+    }
+    path.or_else(|| std::env::var("PGTPSCONFIG").ok())
+        .filter(|path| !path.is_empty())
+        .map(PathBuf::from)
+}
+
+// Like clap, for errors before running
+fn exit_with_error(message: &str) -> ! {
+    eprintln!("error: {}", message);
+    std::process::exit(2);
 }
 
 impl Params {
     pub fn get_args() -> Params {
-        Params::parse()
+        let mut command = Params::command();
+        if let Some(path) = config_path(std::env::args().skip(1)) {
+            let settings = config::read(&path).unwrap_or_else(|err| exit_with_error(&err));
+            for (key, values) in settings {
+                let known = command
+                    .get_arguments()
+                    .any(|arg| arg.get_id() == key.as_str() && key != "config");
+                if !known {
+                    exit_with_error(&format!(
+                        "unknown option \"{}\" in config file \"{}\"",
+                        key,
+                        path.display()
+                    ));
+                }
+                command = command.mut_arg(key, |arg| arg.default_values(values));
+            }
+        }
+        let matches = command.get_matches();
+        Params::from_arg_matches(&matches).unwrap_or_else(|err| err.exit())
     }
     pub fn as_dsn(&self) -> Dsn {
         Dsn::from_string(self.dsn.as_str())
@@ -115,7 +168,26 @@ mod tests {
             min_samples: 0,
             max_wait: max_wait.to_string(),
             output: Format::Table,
+
+            config: None,
         }
+    }
+
+    #[test]
+    fn test_config_path() {
+        let path = |args: &[&str]| config_path(args.iter().map(|a| a.to_string()));
+        assert_eq!(path(&["-c", "a.yaml"]), Some(PathBuf::from("a.yaml")));
+        assert_eq!(path(&["--config", "a.yaml"]), Some(PathBuf::from("a.yaml")));
+        assert_eq!(path(&["--config=a.yaml"]), Some(PathBuf::from("a.yaml")));
+        assert_eq!(path(&["-ca.yaml"]), Some(PathBuf::from("a.yaml")));
+        assert_eq!(
+            path(&["-r", "1:5", "-c", "a.yaml", "-s", "5"]),
+            Some(PathBuf::from("a.yaml"))
+        );
+        assert_eq!(
+            path(&["--", "-c", "a.yaml"]),
+            std::env::var("PGTPSCONFIG").ok().map(PathBuf::from)
+        );
     }
 
     #[test]
