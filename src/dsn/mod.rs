@@ -1,6 +1,7 @@
 use crate::generic;
 
 mod conninfo;
+mod service;
 
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use openssl::x509::store::X509StoreBuilder;
@@ -17,7 +18,7 @@ use uzers::{get_current_uid, get_user_by_uid};
 pub struct Dsn {
     kv: HashMap<String, String>,
     ssl_mode: String,
-    // Errors from parsing the connection string, reported when connecting
+    // Errors from parsing the connection string or the service file, reported when connecting
     invalid: Vec<String>,
 }
 
@@ -89,13 +90,30 @@ impl fmt::Display for Dsn {
 impl Dsn {
     pub fn from_string(from: &str) -> Dsn {
         let mut dsn = Dsn::new();
-        let pairs = match conninfo::parse(from) {
+        let explicit = match conninfo::parse(from) {
             Ok(pairs) => pairs,
             Err(err) => {
-                dsn.invalid.push(err);
+                dsn.invalid
+                    .push(format!("invalid connection string: {}", err));
                 Vec::new()
             }
         };
+        // Settings from a service file override environment variables, and are overridden by
+        // the connection string, like libpq
+        let service = explicit
+            .iter()
+            .rev()
+            .find(|(key, _)| key == "service")
+            .map(|(_, value)| value.to_string())
+            .or_else(|| std::env::var("PGSERVICE").ok());
+        let mut pairs = Vec::new();
+        if let Some(name) = service {
+            match service::lookup(&name, &service::service_files()) {
+                Ok(settings) => pairs.extend(settings),
+                Err(err) => dsn.invalid.push(err),
+            }
+        }
+        pairs.extend(explicit.into_iter().filter(|(key, _)| key != "service"));
         for (key, value) in &pairs {
             dsn.set_value(key, value);
         }
@@ -228,7 +246,7 @@ impl Dsn {
     // the certificate checks are configured on the TLS connector.
     pub fn client(&self) -> Result<Client, Box<dyn Error>> {
         if let Some(err) = self.invalid.first() {
-            return Err(format!("invalid connection string: {}", err).into());
+            return Err(err.to_string().into());
         }
         let mut config: Config = self
             .cleanse()
