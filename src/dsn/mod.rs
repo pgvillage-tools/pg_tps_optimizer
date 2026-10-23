@@ -69,6 +69,7 @@ impl Dsn {
         kv.remove("sslcert");
         kv.remove("sslkey");
         kv.remove("sslrootcert");
+        // sslcrl is not supported (yet), ignore it so a DSN that sets it can still connect
         kv.remove("sslcrl");
         let ssl_mode = "disable".to_string();
         Dsn { kv, ssl_mode }
@@ -108,10 +109,6 @@ impl Dsn {
             // Annoyingly, rust module does not work well with empty password
             // So, for empty [assword we use a string containing just a letter p
             generic::get_env_str("", "PGPASSWORD", ""),
-        );
-        kv.insert(
-            "sslcrl".to_string(),
-            generic::get_env_path("", "PGSSLCRL", "~/.postgresql/root.crl"),
         );
         Dsn { kv, ssl_mode }
     }
@@ -257,7 +254,6 @@ mod tests {
         envvars.insert("PGSSLCERT", "~/cert");
         envvars.insert("PGSSLKEY", "~/key");
         envvars.insert("PGSSLROOTCERT", "~/root");
-        envvars.insert("PGSSLCRL", "~/crl");
         // and set them
         for (key, value) in envvars.iter() {
             std::env::set_var(key, value);
@@ -277,7 +273,6 @@ mod tests {
             "password='' ",
             "port='5432' ",
             "sslcert='~/cert' ",
-            "sslcrl='~/crl' ",
             "sslkey='~/key' ",
             "sslmode='verify-full' ",
             "sslrootcert='~/root' ",
@@ -299,7 +294,6 @@ mod tests {
             )
         );
         let sslcert = generic::shell_exists("~/.postgresql/postgresql.crt");
-        let sslcrl = generic::shell_exists("~/.postgresql/root.crl");
         let sslkey = generic::shell_exists("~/.postgresql/postgresql.key");
         let sslrootcert = generic::shell_exists("~/.postgresql/root.crt");
         assert_eq!(
@@ -311,15 +305,13 @@ mod tests {
                     "password='' ",
                     "port='5432' ",
                     "sslcert='{1}' ",
-                    "sslcrl='{2}' ",
-                    "sslkey='{3}' ",
+                    "sslkey='{2}' ",
                     "sslmode='prefer' ",
-                    "sslrootcert='{4}' ",
+                    "sslrootcert='{3}' ",
                     "user='{0}'"
                 ),
                 os_user_name(),
                 sslcert,
-                sslcrl,
                 sslkey,
                 sslrootcert
             )

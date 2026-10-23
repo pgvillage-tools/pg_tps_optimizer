@@ -48,7 +48,7 @@ This will do the following:
 This could be the output of running the tool:
 ```
 Initializing
-dsn:dbname=postgres host=postgres sslcert=/host/config/tls/int_client/certs/postgres.pem sslcrl= sslkey=/host/config/tls/int_client/private/postgres.key.pem sslmode=prefer sslrootcert=/host/config/tls/int_server/certs/ca-chain-bundle.cert.pem user=postgres
+dsn:dbname=postgres host=postgres sslcert=/host/config/tls/int_client/certs/postgres.pem sslkey=/host/config/tls/int_client/private/postgres.key.pem sslmode=prefer sslrootcert=/host/config/tls/int_server/certs/ca-chain-bundle.cert.pem user=postgres
 transactional: false
 prepared: false
 min threads: 1 max threads: 101
@@ -87,7 +87,6 @@ PGSSLMODE=prefer
 PGSSLCERT=~/.postgresql/postgresql.crt
 PGSSLKEY=~/.postgresql/postgresql.key
 PGSSLROOTCERT=~/.postgresql/root.crt
-PGSSLCRL=~/.postgresql/root.crl
 
 PGTPSSOURCE="" # The source actually is combined with the values from the PG... ENV variables.
 PGTPSQUERY="select * from pg_tables"
