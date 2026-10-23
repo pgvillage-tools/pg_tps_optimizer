@@ -21,3 +21,7 @@ duration-string = "0.5.3"
 more-asserts = "0.3.1"
 range_check = "0.2.0"
 home = "0.5.5"
+
+[dev-dependencies]
+rcgen = "0.14.10"
+testcontainers-modules = { version = "0.15.0", features = ["postgres", "blocking"] }
