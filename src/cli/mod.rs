@@ -1,101 +1,57 @@
 use crate::dsn::Dsn;
-use crate::generic;
 use crate::threader::workload::Workload;
+use clap::Parser;
 use duration_string::DurationString;
-use structopt::StructOpt;
 
-/// Search for a pattern in a file and display the lines that contain it.
-
-#[derive(StructOpt)]
-#[structopt(about = "I detect maximum TPS with minimal latency. Pass `-h` for more info.")]
+// Every option can also be set with an environment variable. An option on the command line wins
+// over the environment variable, which wins over the default.
+#[derive(Parser)]
+#[command(
+    version,
+    about = "I detect maximum TPS with minimal latency. Pass `-h` for more info."
+)]
 pub struct Params {
-    /// Connection string
-    #[structopt(
-        default_value,
-        short,
-        long,
-        help = "the DSN to connect to (or use env vars PG...)"
-    )]
+    /// the DSN to connect to (or use env vars PG...)
+    #[arg(short, long, env = "PGTPSSOURCE", default_value = "")]
     pub dsn: String,
 
-    /// Query
-    #[structopt(default_value, short, long, help = "the query to run")]
+    /// the query to run
+    #[arg(
+        short,
+        long,
+        env = "PGTPSQUERY",
+        default_value = "select * from pg_tables"
+    )]
     pub query: String,
 
-    /// Prepared queries
-    #[structopt(
-        short,
-        long,
-        help = "you can run prepared statements, or run direct statements"
-    )]
-    #[structopt(long)]
+    /// you can run prepared statements, or run direct statements
+    #[arg(short, long, env = "PGTPSPREPARED")]
     pub prepared: bool,
 
-    /// Transactional workload
-    #[structopt(short, long, help = "you can run inside of a transaction or direct")]
+    /// you can run inside of a transaction or direct
+    #[arg(short, long, env = "PGTPSTRANSACTIONAL")]
     pub transactional: bool,
 
-    /// Testrange
-    #[structopt(
-        default_value,
-        short,
-        long,
-        help = "you can set min and max of numclients if you know (default 1:1000)"
-    )]
+    /// you can set min and max of numclients if you know
+    #[arg(short, long, env = "PGTPSRANGE", default_value = "1:1000")]
     pub range: String,
 
-    /// spread
-    #[structopt(
-        default_value,
-        short,
-        long,
-        help = "you can set the spread that defines if the clients run stable."
-    )]
+    /// you can set the spread that defines if the clients run stable.
+    #[arg(short, long, env = "PGTPSSPREAD", default_value_t = 10.0)]
     pub spread: f64,
 
-    /// min_samples
-    #[structopt(
-        default_value,
-        short = "m",
-        long,
-        help = "number of samples before we check the spread."
-    )]
+    /// number of samples before we check the spread.
+    #[arg(short = 'm', long, env = "PGTPSMINSAMPLES", default_value_t = 10)]
     pub min_samples: u32,
 
-    /// max_wait
-    #[structopt(
-        default_value = "",
-        short = "M",
-        long,
-        help = "Give it this ammount of seconds before we decide it wil never stabilize."
-    )]
+    /// Give it this ammount of seconds before we decide it wil never stabilize.
+    #[arg(short = 'M', long, env = "PGTPSMAXWAIT", default_value = "10s")]
     pub max_wait: String,
 }
 
 impl Params {
-    fn from_args() -> Params {
-        <Params as StructOpt>::from_args()
-    }
     pub fn get_args() -> Params {
-        let mut args = Params::from_args();
-        args.dsn = generic::get_env_str(&args.dsn, &String::from("PGTPSSOURCE"), "");
-        args.query = generic::get_env_str(
-            &args.query,
-            &String::from("PGTPSQUERY"),
-            &String::from("select * from pg_tables"),
-        );
-        args.prepared = generic::get_env_bool(args.prepared, &String::from("PGTPSPREPARED"));
-        args.transactional =
-            generic::get_env_bool(args.transactional, &String::from("PGTPSTRANSACTIONAL"));
-        args.range = generic::get_env_str(
-            &args.range,
-            &String::from("PGTPSRANGE"),
-            &String::from("1:1000"),
-        );
-        args.max_wait = generic::get_env_str(&args.max_wait, "PGTPSMAXWAIT", "10s");
-        args.spread = generic::get_env_f64(args.spread, "PGTPSSPREAD", 10.0);
-        args.min_samples = generic::get_env_u32(args.min_samples, "PGTPSMINSAMPLES", 10);
-        args
+        Params::parse()
     }
     pub fn as_dsn(&self) -> Dsn {
         Dsn::from_string(self.dsn.as_str())
