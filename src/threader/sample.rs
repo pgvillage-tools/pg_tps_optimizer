@@ -96,7 +96,7 @@ impl Sample {
     // add a transaction (with the duration of it)
     pub fn increment(&mut self, wait: Duration) {
         self.transactions += 1;
-        self.wait = self.wait + wait;
+        self.wait += wait;
     }
     // stop sampling
     pub fn end(&mut self) {
@@ -174,8 +174,8 @@ impl ParallelSample {
             return Err("trying to combine samples of different timeslices");
         }
         self.total_transactions += samples.total_transactions;
-        self.total_waits = self.total_waits + samples.total_waits;
-        self.total_duration = self.total_duration + samples.total_duration;
+        self.total_waits += samples.total_waits;
+        self.total_duration += samples.total_duration;
         self.num_samples += samples.num_samples;
         Ok(())
     }
@@ -323,7 +323,7 @@ impl TestResults {
         let mut num: u64 = 0;
         let mut tot_lat = Duration::zero();
         for tr in self.results.clone() {
-            tot_lat = tot_lat + tr.latency;
+            tot_lat += tr.latency;
             num += 1
         }
         match num {
