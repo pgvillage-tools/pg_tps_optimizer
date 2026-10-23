@@ -211,7 +211,7 @@ the operating system does. Only `sslrootcert` is trusted.
 ⁴ A host list with a unix socket and a TCP host. `require`, `verify-ca` and `verify-full` are refused
 for such a list, instead of connecting to the TCP host without TLS.
 
-Every filled cell is covered by an end-to-end test in [`tests/e2e.rs`](../tests/e2e.rs), which runs
+Every filled cell is covered by an end-to-end test in [`tests/e2e.rs`](https://github.com/pgvillage-tools/pg_tps_optimizer/blob/main/tests/e2e.rs), which runs
 pg_tps_optimizer against PostgreSQL in a container.
 
 ## When connecting fails

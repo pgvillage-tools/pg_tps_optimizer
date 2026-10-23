@@ -1,0 +1,74 @@
+site_name: pg_tps_optimizer
+site_description: Find the number of clients that gives PostgreSQL the maximum TPS with minimal latency
+site_url: https://pgvillage-tools.github.io/pg_tps_optimizer/
+
+repo_name: pgvillage-tools/pg_tps_optimizer
+repo_url: https://github.com/pgvillage-tools/pg_tps_optimizer
+edit_uri: edit/main/docs
+
+theme:
+  name: material
+  custom_dir: mkdocs_overrides
+  language: en
+  features:
+    - content.action.edit
+    - content.code.copy
+    - navigation.indexes
+    - navigation.path
+    - navigation.sections
+    - navigation.top
+    - navigation.tracking
+    - search.suggest
+    - toc.follow
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+
+copyright: Copyright &copy; Nibble-IT
+
+extra:
+  version:
+    provider: mike
+    alias: true
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      title: On this page
+      permalink: true
+      toc_depth: 3
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+plugins:
+  - search
+  # Serve external assets (like fonts) from the site itself, instead of loading them from Google
+  - privacy
+  # The navigation follows the directory structure of docs/; a directory can set its own order
+  # and titles in a README.md
+  - literate-nav:
+      nav_file: README.md
+      implicit_index: true
+  # Keep old links working when a page moves: 'old/page.md': 'new/page.md'
+  - redirects:
+      redirect_maps: {}
