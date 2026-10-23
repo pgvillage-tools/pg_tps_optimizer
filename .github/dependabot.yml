@@ -30,7 +30,7 @@ updates:
       prefix: "deps(actions)"
     labels: ["dependencies", "github-actions"]
 
-  # Base images in Dockerfile (rust, debian)
+  # Base images in Containerfile (rust, debian)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

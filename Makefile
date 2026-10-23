@@ -10,8 +10,9 @@ test: unittest coverage
 unittest:
 	cargo test
 
+# Needs docker (or podman with its docker socket)
 integrationtest:
-	./docker-compose-tests.sh
+	cargo test --test e2e -- --ignored
 
 coverage:
 	./unittests.sh
