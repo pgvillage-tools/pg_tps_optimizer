@@ -165,7 +165,8 @@ struct Run {
 fn run_pg_tps_optimizer(home: &Path, env: &[(&str, String)]) -> Run {
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_pg_tps_optimizer"));
     for (key, _) in std::env::vars() {
-        if key.starts_with("PG") {
+        // SSL_CERT_FILE and SSL_CERT_DIR change the OS trust store OpenSSL uses
+        if key.starts_with("PG") || key.starts_with("SSL_CERT_") {
             cmd.env_remove(key);
         }
     }
@@ -242,6 +243,9 @@ enum RootCert {
     Wrong,
     // No root certificate at all (not set, and no ~/.postgresql/root.crt)
     Missing,
+    // A CA that did not sign the server certificate, while the OS trust store (SSL_CERT_FILE)
+    // does trust the server certificate: only sslrootcert may be trusted
+    WrongButTrustedByOs,
 }
 
 #[derive(Clone, Copy)]
@@ -278,13 +282,18 @@ fn check_sslmode(
     ];
     let root_cert_pem = match root_cert {
         RootCert::Correct => Some(server_certs().ca.as_str()),
-        RootCert::Wrong => Some(other_ca()),
+        RootCert::Wrong | RootCert::WrongButTrustedByOs => Some(other_ca()),
         RootCert::Missing => None,
     };
     if let Some(pem) = root_cert_pem {
         let path = dir.join("root.crt");
         fs::write(&path, pem).unwrap();
         env.push(("PGSSLROOTCERT", path.display().to_string()));
+    }
+    if let RootCert::WrongButTrustedByOs = root_cert {
+        let path = dir.join("os-trust-store.crt");
+        fs::write(&path, &server_certs().ca).unwrap();
+        env.push(("SSL_CERT_FILE", path.display().to_string()));
     }
 
     let run = run_pg_tps_optimizer(&home, &env);
@@ -345,6 +354,15 @@ sslmode_tests! {
     // The server certificate is for localhost, not 127.0.0.1: only verify-full checks that
     sslmode_verify_ca_with_tls_hostname_mismatch: WithTls, "127.0.0.1", "verify-ca", Correct => Connects;
     sslmode_verify_full_with_tls_hostname_mismatch: WithTls, "127.0.0.1", "verify-full", Correct => FailsCleanly;
+
+    // Only sslrootcert is trusted, not the CAs of the OS trust store
+    sslmode_verify_ca_with_tls_wrong_ca_trusted_by_os: WithTls, "localhost", "verify-ca", WrongButTrustedByOs => FailsCleanly;
+    sslmode_verify_full_with_tls_wrong_ca_trusted_by_os: WithTls, "localhost", "verify-full", WrongButTrustedByOs => FailsCleanly;
+
+    // sslmode is ignored for unix sockets, but that must not drop TLS for the TCP hosts in a
+    // host list that also has a unix socket
+    sslmode_prefer_with_socket_and_tcp_hosts: WithoutTls, "/nonexistent,localhost", "prefer", Correct => Connects;
+    sslmode_require_with_socket_and_tcp_hosts: WithoutTls, "/nonexistent,localhost", "require", Correct => FailsCleanly;
 }
 
 #[test]

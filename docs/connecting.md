@@ -65,9 +65,13 @@ Keep in mind:
 
 Some things to keep in mind:
 
-- **Only `verify-ca` and `verify-full` protect against a man-in-the-middle.** `prefer` and
-  `require` encrypt the connection, but don't check who you are talking to. Use `verify-full` when
-  that matters.
+- **Use `verify-full` to protect against a man-in-the-middle.** `prefer` and `require` encrypt the
+  connection, but don't check who you are talking to. `verify-ca` checks that the server
+  certificate is signed by your root certificate, but not for which server: any server with a
+  certificate from that CA is accepted. That is only safe when the CA signs nothing but your
+  PostgreSQL servers. `verify-full` also checks the host name.
+- **Only `sslrootcert` is trusted.** `verify-ca` and `verify-full` don't trust the CAs of the
+  operating system, only the root certificate(s) in `sslrootcert` (or `~/.postgresql/root.crt`).
 - **`require` never checks the server certificate**, not even when a root certificate is configured.
   This differs from libpq, where `require` behaves like `verify-ca` when a root certificate file
   exists.
@@ -79,7 +83,10 @@ Some things to keep in mind:
   only accepts TLS connections) does it try again with TLS. When both fail, the error of the TLS
   attempt is reported.
 - **Unix sockets never use TLS.** Like libpq, `sslmode` is ignored when `host` is a directory
-  (starts with `/`).
+  (starts with `/`). A host list that mixes unix sockets and TCP hosts (like
+  `host=/var/run/postgresql,db1.example.com`) can't be used with `require`, `verify-ca` or
+  `verify-full`: pg_tps_optimizer stops with an error, instead of connecting to the TCP hosts
+  without TLS.
 
 ### Client certificates
 
@@ -90,7 +97,9 @@ certificate.
 
 Certificates and keys must be PEM files. When a certificate, key or root certificate is set but
 can't be loaded (missing file, wrong format), pg_tps_optimizer stops with an error, instead of
-connecting without it.
+connecting without it. A certificate and key only work as a pair: setting only one of them (or
+having only one of the two default files) is an error as well. libpq silently ignores a key
+without a certificate.
 
 ### Example: client certificate and verify-full
 
@@ -130,6 +139,8 @@ benchmark runs; *fails* means pg_tps_optimizer stops with an error (see
 | TLS only | wrong CA | localhost | | | ✅ connects | ✅ connects ¹ | ❌ fails | ❌ fails |
 | TLS only | none | localhost | | | | ✅ connects | ❌ fails | ❌ fails |
 | TLS only | correct | 127.0.0.1 ² | | | | | ✅ connects | ❌ fails |
+| TLS only | wrong CA, but trusted by the OS ³ | localhost | | | | | ❌ fails | ❌ fails |
+| without TLS | correct | `/nonexistent,localhost` ⁴ | | | ✅ connects | ❌ fails | | |
 
 - **Server without TLS:** `ssl = off` in `postgresql.conf`.
 - **TLS only:** `ssl = on`, and `pg_hba.conf` only has `hostssl` entries (no `host` or `hostnossl`),
@@ -141,6 +152,10 @@ benchmark runs; *fails* means pg_tps_optimizer stops with an error (see
 ¹ `require` never checks the server certificate. libpq checks the CA for `require` when a root
 certificate is configured; pg_tps_optimizer deliberately doesn't.
 ² The server certificate is only valid for `localhost`, so only `verify-full` notices the mismatch.
+³ `sslrootcert` doesn't contain the CA that signed the server certificate, but the trust store of
+the operating system does. Only `sslrootcert` is trusted.
+⁴ A host list with a unix socket and a TCP host. `require`, `verify-ca` and `verify-full` are refused
+for such a list, instead of connecting to the TCP host without TLS.
 
 Every filled cell is covered by an end-to-end test in [`tests/e2e.rs`](../tests/e2e.rs), which runs
 pg_tps_optimizer against PostgreSQL in a container.
@@ -165,6 +180,9 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `connection requires a valid client certificate` | `pg_hba.conf` uses `cert`, but no client certificate is configured |
 | `certificate verify failed` | `sslmode=verify-*` and the server certificate isn't signed by the root certificate, or (`verify-full`) isn't valid for the host name |
 | `root certificate file ... does not exist` | `sslmode=verify-*` without a root certificate |
+| `sslkey is set, but sslcert is not` (or the other way around) | only one of the client certificate and key is configured, or only one of the default files in `~/.postgresql` exists |
+| `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |
+| `invalid connection string` | the connection string has an unknown key (for instance `client_encoding`) or something that is not a `key=value` pair (for instance a URL) |
 | `Connection refused` | wrong host or port, or PostgreSQL isn't running |
 
 All errors currently use exit code 1. Separate exit codes per kind of error are planned in

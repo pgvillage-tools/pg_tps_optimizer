@@ -1,5 +1,6 @@
 use crate::generic;
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
+use openssl::x509::store::X509StoreBuilder;
 use postgres::config::SslMode;
 use postgres::{Client, Config, NoTls};
 use postgres_openssl::MakeTlsConnector;
@@ -184,10 +185,24 @@ impl Dsn {
             .to_string()
             .parse()
             .map_err(|e: postgres::Error| error_chain(&e))?;
-        // Like libpq, sslmode is ignored for unix sockets
-        let ssl_mode = match self.get_value("host", "").starts_with('/') {
-            true => "disable",
-            false => self.ssl_mode.as_str(),
+        // Like libpq, sslmode is ignored for unix sockets. The postgres crate uses one sslmode
+        // for all hosts, so a mix of unix sockets and TCP hosts can't skip TLS for the sockets
+        // only, and must not drop TLS for the TCP hosts.
+        let host = self.get_value("host", "");
+        let sockets = host.split(',').filter(|h| h.starts_with('/')).count();
+        let ssl_mode = if sockets == host.split(',').count() {
+            "disable"
+        } else if sockets > 0
+            && ["require", "verify-ca", "verify-full"].contains(&self.ssl_mode.as_str())
+        {
+            return Err(format!(
+                "host \"{}\" mixes unix sockets and TCP hosts, which is not supported with \
+                 sslmode={}",
+                host, self.ssl_mode
+            )
+            .into());
+        } else {
+            self.ssl_mode.as_str()
         };
         let result = match ssl_mode {
             "disable" => config.ssl_mode(SslMode::Disable).connect(NoTls),
@@ -219,15 +234,30 @@ impl Dsn {
     fn tls_connector(&self) -> Result<MakeTlsConnector, Box<dyn Error>> {
         let mut builder = SslConnector::builder(SslMethod::tls())?;
 
-        // Only use a client certificate when one is set, or the default one exists
+        // Only use a client certificate when one is set, or the default one exists. The
+        // certificate and key only work as a pair.
         let cert_file = self.get_value("sslcert", "");
+        let key_file = self.get_value("sslkey", "");
+        if cert_file.is_empty() && !key_file.is_empty() {
+            return Err(format!(
+                "sslkey is set (\"{}\"), but sslcert is not; a client certificate needs both",
+                key_file
+            )
+            .into());
+        }
+        if !cert_file.is_empty() && key_file.is_empty() {
+            return Err(format!(
+                "sslcert is set (\"{}\"), but sslkey is not; a client certificate needs both",
+                cert_file
+            )
+            .into());
+        }
         if !cert_file.is_empty() {
             builder
                 .set_certificate_chain_file(&cert_file)
                 .map_err(|e| {
                     format!("could not load client certificate \"{}\": {}", cert_file, e)
                 })?;
-            let key_file = self.get_value("sslkey", "");
             builder
                 .set_private_key_file(&key_file, SslFiletype::PEM)
                 .map_err(|e| format!("could not load private key \"{}\": {}", key_file, e))?;
@@ -247,6 +277,9 @@ impl Dsn {
                 )
                 .into());
             }
+            // SslConnector::builder trusts the CAs of the OS trust store, but only sslrootcert
+            // may be trusted, so start from an empty store
+            builder.set_cert_store(X509StoreBuilder::new()?.build());
             builder
                 .set_ca_file(&root_cert)
                 .map_err(|e| format!("could not load root certificate \"{}\": {}", root_cert, e))?;
@@ -366,6 +399,23 @@ mod tests {
             .unwrap()
             .to_string();
         assert!(err.contains("unknown option `unknown_key`"), "{}", err);
+    }
+
+    #[test]
+    fn test_client_certificate_needs_key_and_cert() {
+        let err = Dsn::from_string("host=localhost sslmode=require sslcert= sslkey=/my.key")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("sslkey is set"), "{}", err);
+
+        let err = Dsn::from_string("host=localhost sslmode=require sslcert=/my.crt sslkey=")
+            .client()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(err.contains("sslcert is set"), "{}", err);
     }
 
     #[test]
