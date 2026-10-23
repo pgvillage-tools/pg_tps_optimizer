@@ -18,6 +18,8 @@ use uzers::{get_current_uid, get_user_by_uid};
 pub struct Dsn {
     kv: HashMap<String, String>,
     ssl_mode: String,
+    // Whether sslmode is set (PGSSLMODE or sslmode=), or is the default
+    ssl_mode_set: bool,
     // Errors from parsing the connection string or the service file, reported when connecting
     invalid: Vec<String>,
 }
@@ -129,6 +131,19 @@ impl Dsn {
                 dsn.set_value("host", &default_socket_dir(&SOCKET_DIRS, &port));
             }
         }
+        // sslrootcert=system trusts the CAs of the OS, which only protects against a
+        // man-in-the-middle with a host name check, so it requires verify-full, like libpq
+        if dsn.get_value("sslrootcert", "") == "system" {
+            if !dsn.ssl_mode_set {
+                dsn.set_value("sslmode", "verify-full");
+            } else if dsn.ssl_mode != "verify-full" {
+                let err = format!(
+                    "weak sslmode \"{}\" may not be used with sslrootcert=system (use \"verify-full\")",
+                    dsn.ssl_mode
+                );
+                dsn.invalid.push(err);
+            }
+        }
         dsn
     }
     pub fn cleanse(&self) -> Dsn {
@@ -144,6 +159,7 @@ impl Dsn {
         Dsn {
             kv,
             ssl_mode,
+            ssl_mode_set: self.ssl_mode_set,
             invalid: self.invalid.clone(),
         }
     }
@@ -197,6 +213,7 @@ impl Dsn {
         Dsn {
             kv,
             ssl_mode,
+            ssl_mode_set: std::env::var("PGSSLMODE").is_ok(),
             invalid: Vec::new(),
         }
     }
@@ -216,7 +233,8 @@ impl Dsn {
     fn set_value(&mut self, key: &str, value: &str) {
         self.kv.insert(key.to_string(), value.to_string());
         if key.eq("sslmode") {
-            self.ssl_mode = value.to_string()
+            self.ssl_mode = value.to_string();
+            self.ssl_mode_set = true;
         }
     }
     fn get_value(&self, key: &str, default: &str) -> String {
@@ -334,6 +352,9 @@ impl Dsn {
         // Only verify-ca and verify-full check the server certificate
         if self.verify_ca() {
             let root_cert = self.get_value("sslrootcert", "");
+            if root_cert == "system" {
+                return self.system_tls_connector(builder);
+            }
             if root_cert.is_empty() || !Path::new(&root_cert).exists() {
                 return Err(format!(
                     "root certificate file \"{}\" does not exist; either provide the file or \
@@ -355,6 +376,40 @@ impl Dsn {
             builder.set_verify(SslVerifyMode::NONE);
         }
 
+        self.finish_tls_connector(builder)
+    }
+    // sslrootcert=system: trust the CAs of the OS. The OpenSSL built into the binary doesn't
+    // know where the OS keeps them, so look for them (like native-tls does); SSL_CERT_FILE and
+    // SSL_CERT_DIR still win.
+    fn system_tls_connector(
+        &self,
+        mut builder: openssl::ssl::SslConnectorBuilder,
+    ) -> Result<MakeTlsConnector, Box<dyn Error>> {
+        builder.set_cert_store(X509StoreBuilder::new()?.build());
+        let probe = openssl_probe::probe();
+        if probe.cert_file.is_none() && probe.cert_dir.is_empty() {
+            return Err(
+                "sslrootcert=system: no certificates of the OS found; set SSL_CERT_FILE \
+                        or SSL_CERT_DIR"
+                    .into(),
+            );
+        }
+        if let Some(file) = &probe.cert_file {
+            builder
+                .load_verify_locations(Some(file), None)
+                .map_err(|e| format!("could not load \"{}\": {}", file.display(), e))?;
+        }
+        for dir in &probe.cert_dir {
+            builder
+                .load_verify_locations(None, Some(dir))
+                .map_err(|e| format!("could not load \"{}\": {}", dir.display(), e))?;
+        }
+        self.finish_tls_connector(builder)
+    }
+    fn finish_tls_connector(
+        &self,
+        builder: openssl::ssl::SslConnectorBuilder,
+    ) -> Result<MakeTlsConnector, Box<dyn Error>> {
         let mut connector = MakeTlsConnector::new(builder.build());
         let verify_hostname = self.verify_hostname();
         connector.set_callback(move |config, _| {

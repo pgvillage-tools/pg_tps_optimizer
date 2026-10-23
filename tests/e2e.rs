@@ -676,3 +676,58 @@ fn prepares_statements_once_per_client_in_transactions() {
         "true",
     );
 }
+
+// sslrootcert=system trusts the CAs of the OS (here set with SSL_CERT_FILE), and requires
+// verify-full, like libpq
+#[test]
+#[ignore = "requires a container runtime"]
+fn sslrootcert_system() {
+    let pg = start_postgres_with_tls(server_certs(), PG_HBA_TLS_ONLY);
+    let dir = scratch_dir("sslrootcert_system");
+    let home = dir.join("home");
+    fs::create_dir_all(&home).unwrap();
+    let (server_ca, wrong_ca) = (dir.join("server-ca.crt"), dir.join("wrong-ca.crt"));
+    fs::write(&server_ca, &server_certs().ca).unwrap();
+    fs::write(&wrong_ca, other_ca()).unwrap();
+    let env = |extra: &[(&'static str, String)]| {
+        let mut env = vec![
+            ("PGHOST", "localhost".to_string()),
+            ("PGPORT", pg.get_host_port_ipv4(5432).unwrap().to_string()),
+            ("PGUSER", "postgres".to_string()),
+            ("PGDATABASE", "postgres".to_string()),
+            ("PGSSLROOTCERT", "system".to_string()),
+        ];
+        env.extend_from_slice(extra);
+        env
+    };
+
+    // The OS trusts the server CA; sslmode defaults to verify-full
+    run_pg_tps_optimizer(
+        &home,
+        &env(&[("SSL_CERT_FILE", server_ca.display().to_string())]),
+    )
+    .assert_success();
+
+    // The OS doesn't trust the server CA
+    run_pg_tps_optimizer(
+        &home,
+        &env(&[("SSL_CERT_FILE", wrong_ca.display().to_string())]),
+    )
+    .assert_clean_failure();
+
+    // A weaker sslmode is refused
+    let run = run_pg_tps_optimizer(
+        &home,
+        &env(&[
+            ("SSL_CERT_FILE", server_ca.display().to_string()),
+            ("PGSSLMODE", "require".to_string()),
+        ]),
+    );
+    run.assert_clean_failure();
+    assert!(
+        String::from_utf8_lossy(&run.output.stderr)
+            .contains("weak sslmode \"require\" may not be used with sslrootcert=system"),
+        "{}",
+        run.describe()
+    );
+}
