@@ -64,10 +64,10 @@ plugins:
   - search
   # Serve external assets (like fonts) from the site itself, instead of loading them from Google
   - privacy
-  # The navigation follows the directory structure of docs/; a directory can set its own order
-  # and titles in a README.md
+  # The navigation follows the directory structure of docs/, unless a directory has a SUMMARY.md
+  # with a list of links that sets the order and titles
   - literate-nav:
-      nav_file: README.md
+      nav_file: SUMMARY.md
       implicit_index: true
   # Keep old links working when a page moves: 'old/page.md': 'new/page.md'
   - redirects:
