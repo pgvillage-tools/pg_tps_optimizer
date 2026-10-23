@@ -1,0 +1,40 @@
+version: 2
+updates:
+  # Rust crates (Cargo.toml / Cargo.lock)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    # Don't pick up a release until it has been out for a few days
+    cooldown:
+      default-days: 5
+    groups:
+      # One PR for all minor/patch bumps instead of one per crate
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
+    commit-message:
+      prefix: "deps(cargo)"
+    labels: ["dependencies", "rust"]
+
+  # Actions used in .github/workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "deps(actions)"
+    labels: ["dependencies", "github-actions"]
+
+  # Base images in Dockerfile (rust, debian)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    commit-message:
+      prefix: "deps(docker)"
+    labels: ["dependencies", "docker"]
