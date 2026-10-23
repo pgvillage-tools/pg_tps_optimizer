@@ -49,6 +49,19 @@ fn default_socket_dir(dirs: &[&str], port: &str) -> String {
         .to_string()
 }
 
+// libpq environment variables (https://www.postgresql.org/docs/current/libpq-envars.html) for
+// settings without a default, and the connection setting they set
+const ENV_SETTINGS: [(&str, &str); 8] = [
+    ("PGHOSTADDR", "hostaddr"),
+    ("PGAPPNAME", "application_name"),
+    ("PGOPTIONS", "options"),
+    ("PGCONNECT_TIMEOUT", "connect_timeout"),
+    ("PGTARGETSESSIONATTRS", "target_session_attrs"),
+    ("PGCHANNELBINDING", "channel_binding"),
+    ("PGLOADBALANCEHOSTS", "load_balance_hosts"),
+    ("PGSSLNEGOTIATION", "sslnegotiation"),
+];
+
 fn os_user_name() -> String {
     let mut user = generic::get_env_str("", "PGUSER", "").to_string();
     if user.is_empty() {
@@ -86,13 +99,17 @@ impl Dsn {
         for (key, value) in &pairs {
             dsn.set_value(key, value);
         }
-        // Without a host, look for the socket of the port from the connection string
-        let has_host = pairs
-            .iter()
-            .any(|(key, _)| key == "host" || key == "hostaddr");
-        if !has_host && std::env::var("PGHOST").is_err() {
-            let port = dsn.get_value("port", "5432");
-            dsn.set_value("host", &default_socket_dir(&SOCKET_DIRS, &port));
+        let has = |name: &str| pairs.iter().any(|(key, _)| key == name);
+        if !has("host") {
+            if has("hostaddr") {
+                // The postgres crate needs a host name for TLS, so use the address, like libpq
+                let hostaddr = dsn.get_value("hostaddr", "");
+                dsn.set_value("host", &hostaddr);
+            } else if std::env::var("PGHOST").is_err() && std::env::var("PGHOSTADDR").is_err() {
+                // Look for the socket of the port from the connection string
+                let port = dsn.get_value("port", "5432");
+                dsn.set_value("host", &default_socket_dir(&SOCKET_DIRS, &port));
+            }
         }
         dsn
     }
@@ -121,11 +138,24 @@ impl Dsn {
             generic::get_env_str("", "PGDATABASE", os_user_name().as_str()),
         );
         let port = generic::get_env_str("", "PGPORT", "5432");
+        // Without PGHOST, use PGHOSTADDR as host (the postgres crate needs a host name for TLS),
+        // or look for the default unix socket
+        let hostaddr = generic::get_env_str("", "PGHOSTADDR", "");
+        let default_host = match hostaddr.is_empty() {
+            true => default_socket_dir(&SOCKET_DIRS, &port),
+            false => hostaddr,
+        };
         kv.insert(
             "host".to_string(),
-            generic::get_env_str("", "PGHOST", &default_socket_dir(&SOCKET_DIRS, &port)),
+            generic::get_env_str("", "PGHOST", &default_host),
         );
         kv.insert("port".to_string(), port);
+        // Other libpq environment variables, for settings the postgres crate supports
+        for (env_key, key) in ENV_SETTINGS {
+            if let Ok(value) = std::env::var(env_key) {
+                kv.insert(key.to_string(), value);
+            }
+        }
         let ssl_mode = generic::get_env_str("", "PGSSLMODE", "prefer");
         kv.insert("sslmode".to_string(), ssl_mode.to_string());
         kv.insert(
