@@ -1,4 +1,7 @@
 use crate::generic;
+
+mod conninfo;
+
 use openssl::ssl::{SslConnector, SslFiletype, SslMethod, SslVerifyMode};
 use openssl::x509::store::X509StoreBuilder;
 use postgres::config::SslMode;
@@ -14,7 +17,7 @@ use uzers::{get_current_uid, get_user_by_uid};
 pub struct Dsn {
     kv: HashMap<String, String>,
     ssl_mode: String,
-    // Parts of the connection string that are not key=value, reported when connecting
+    // Errors from parsing the connection string, reported when connecting
     invalid: Vec<String>,
 }
 
@@ -73,16 +76,20 @@ impl fmt::Display for Dsn {
 impl Dsn {
     pub fn from_string(from: &str) -> Dsn {
         let mut dsn = Dsn::new();
-        let split = from.split(' ');
-        for s in split {
-            if let Some((key, value)) = s.split_once('=') {
-                dsn.set_value(key, value)
-            } else if !s.is_empty() {
-                dsn.invalid.push(s.to_string())
+        let pairs = match conninfo::parse(from) {
+            Ok(pairs) => pairs,
+            Err(err) => {
+                dsn.invalid.push(err);
+                Vec::new()
             }
+        };
+        for (key, value) in &pairs {
+            dsn.set_value(key, value);
         }
         // Without a host, look for the socket of the port from the connection string
-        let has_host = from.split(' ').any(|s| s.starts_with("host="));
+        let has_host = pairs
+            .iter()
+            .any(|(key, _)| key == "host" || key == "hostaddr");
         if !has_host && std::env::var("PGHOST").is_err() {
             let port = dsn.get_value("port", "5432");
             dsn.set_value("host", &default_socket_dir(&SOCKET_DIRS, &port));
@@ -190,12 +197,8 @@ impl Dsn {
     // disable, prefer and require, so allow, verify-ca and verify-full are built from those, and
     // the certificate checks are configured on the TLS connector.
     pub fn client(&self) -> Result<Client, Box<dyn Error>> {
-        if let Some(part) = self.invalid.first() {
-            return Err(format!(
-                "invalid connection string: \"{}\" is not a key=value pair (URLs are not supported)",
-                part
-            )
-            .into());
+        if let Some(err) = self.invalid.first() {
+            return Err(format!("invalid connection string: {}", err).into());
         }
         let mut config: Config = self
             .cleanse()
@@ -426,12 +429,12 @@ mod tests {
 
     #[test]
     fn test_invalid_connection_string() {
-        let err = Dsn::from_string("postgresql://user@host/db")
-            .client()
-            .err()
-            .unwrap()
-            .to_string();
-        assert!(err.contains("is not a key=value pair"), "{}", err);
+        let err = Dsn::from_string("host").client().err().unwrap().to_string();
+        assert!(
+            err.contains("invalid connection string: missing \"=\" after \"host\""),
+            "{}",
+            err
+        );
 
         let err = Dsn::from_string("host=/tmp unknown_key=value")
             .client()
@@ -443,14 +446,14 @@ mod tests {
 
     #[test]
     fn test_client_certificate_needs_key_and_cert() {
-        let err = Dsn::from_string("host=localhost sslmode=require sslcert= sslkey=/my.key")
+        let err = Dsn::from_string("host=localhost sslmode=require sslcert='' sslkey=/my.key")
             .client()
             .err()
             .unwrap()
             .to_string();
         assert!(err.contains("sslkey is set"), "{}", err);
 
-        let err = Dsn::from_string("host=localhost sslmode=require sslcert=/my.crt sslkey=")
+        let err = Dsn::from_string("host=localhost sslmode=require sslcert=/my.crt sslkey=''")
             .client()
             .err()
             .unwrap()

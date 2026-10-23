@@ -395,3 +395,30 @@ fn runs_with_client_certificate_and_verify_full() {
     );
     run.assert_success();
 }
+
+#[test]
+#[ignore = "requires a container runtime"]
+fn runs_with_connection_uri() {
+    let pg = start_postgres();
+    let home = scratch_dir("runs_with_connection_uri").join("home");
+    fs::create_dir_all(&home).unwrap();
+    let uri = format!(
+        "postgresql://postgres@localhost:{}/postgres?sslmode=disable&application_name=pg%20tps",
+        pg.get_host_port_ipv4(5432).unwrap()
+    );
+    run_pg_tps_optimizer(&home, &[("PGTPSSOURCE", uri)]).assert_success();
+}
+
+#[test]
+#[ignore = "requires a container runtime"]
+fn runs_with_quoted_connection_string_values() {
+    let pg = start_postgres();
+    let home = scratch_dir("runs_with_quoted_connection_string_values").join("home");
+    fs::create_dir_all(&home).unwrap();
+    let conninfo = format!(
+        "host = localhost port='{}' user=postgres dbname='postgres' sslmode=disable \
+         application_name='pg tps \\'optimizer\\''",
+        pg.get_host_port_ipv4(5432).unwrap()
+    );
+    run_pg_tps_optimizer(&home, &[("PGTPSSOURCE", conninfo)]).assert_success();
+}
