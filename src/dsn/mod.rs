@@ -225,7 +225,7 @@ mod tests {
         );
         assert_eq!(d.to_string(), expected.replace("~", home_dir.as_str()),);
         // and unset them
-        for (key, _) in envvars.iter() {
+        for key in envvars.keys() {
             std::env::remove_var(key);
         }
         // And test without them being set
