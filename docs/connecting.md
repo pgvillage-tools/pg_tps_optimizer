@@ -8,11 +8,12 @@ settings work the way you know from `psql`. Differences are listed explicitly be
 
 ## Connection settings
 
-Connection settings come from three places. Later sources override earlier ones:
+Connection settings come from four places. Later sources override earlier ones, like in libpq:
 
 1. Built-in defaults
 2. Environment variables
-3. The connection string, given with `--dsn` (`-d`) or the `PGTPSSOURCE` environment variable
+3. A service from a [service file](#service-files), when `service` or `PGSERVICE` is set
+4. The connection string, given with `--dsn` (`-d`) or the `PGTPSSOURCE` environment variable
    (`--dsn` wins when both are set)
 
 | Setting | Environment variable | Default |
@@ -68,11 +69,38 @@ URIs (`postgresql://` or `postgres://`):
 In both formats, `~` is not expanded (only in environment variables): use absolute paths for
 certificate files.
 
+### Service files
+
+A service file holds named sets of connection settings, so you only need to give the service
+name, with `service=bench` in the connection string or `PGSERVICE=bench`:
+
+```
+# ~/.pg_service.conf
+[bench]
+host=db1.example.com
+port=5432
+user=postgres
+dbname=postgres
+sslmode=verify-full
+sslrootcert=/etc/pg_tps_optimizer/root.crt
+```
+
+The service is looked up like libpq does, in the first of these files that defines it:
+
+1. The user service file: `PGSERVICEFILE`, or `~/.pg_service.conf`
+2. The system service file: `pg_service.conf` in `PGSYSCONFDIR`. Without `PGSYSCONFDIR`,
+   `/etc/postgresql-common/pg_service.conf` (Debian/Ubuntu) and
+   `/etc/sysconfig/pgsql/pg_service.conf` (RHEL) are used. (libpq uses the one directory it was
+   built with.)
+
+Every line in a service is `key=value`; values are not quoted, and lines starting with `#` are
+comments. Settings in the connection string override the service, and the service overrides
+environment variables. When the service isn't defined in any of the files, pg_tps_optimizer stops
+with `definition of service "bench" not found`.
+
 ### Not supported
 
-- A password file (`~/.pgpass`, `PGPASSFILE`) or service file (`pg_service.conf`, see
-  [#56](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/56)). Use `PGPASSWORD` or
-  `password=` instead.
+- A password file (`~/.pgpass`, `PGPASSFILE`). Use `PGPASSWORD` or `password=` instead.
 - Certificate revocation lists (`sslcrl`, `PGSSLCRL`). An `sslcrl` in the connection string is
   ignored. Please open an issue if you need it.
 
@@ -208,6 +236,7 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `root certificate file ... does not exist` | `sslmode=verify-*` without a root certificate |
 | `sslkey is set, but sslcert is not` (or the other way around) | only one of the client certificate and key is configured, or only one of the default files in `~/.postgresql` exists |
 | `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |
+| `definition of service ... not found` | `service` or `PGSERVICE` names a service that is not in any [service file](#service-files) |
 | `invalid connection string` | the connection string can't be parsed (for instance an unterminated quote, or a key without `=`), or has an unknown key (for instance `client_encoding`) |
 | `Connection refused` | wrong host or port, or PostgreSQL isn't running |
 
