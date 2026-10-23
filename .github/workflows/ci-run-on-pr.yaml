@@ -22,7 +22,7 @@ jobs:
       e2e: ${{ steps.filter.outputs.e2e_any_changed }}
       ci: ${{ steps.filter.outputs.ci_any_changed }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
         id: filter
         with:
@@ -62,14 +62,14 @@ jobs:
       - codechanges
     if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
         with:
           components: rustfmt, clippy
       # rustfmt needs no compilation, so fail fast before building anything
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       # clippy also does everything `cargo check` does
       - name: Run cargo clippy
         run: cargo clippy -- -D warnings
@@ -81,9 +81,9 @@ jobs:
       - codechanges
     if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Run cargo test
         run: cargo test
 
@@ -96,9 +96,9 @@ jobs:
     # Also run when unit-test was skipped (only docker/compose files changed), but not when it failed
     if: ${{ !cancelled() && !failure() && (needs.codechanges.outputs.e2e == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
     steps:
-      - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@b725eda525362e7cf34af9a7243cac1e3f01a7ec # stable
+      - uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: update to docker-compose v2
         run: |
           sudo curl -SL https://github.com/docker/compose/releases/download/v2.3.3/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
