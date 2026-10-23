@@ -78,6 +78,7 @@ Finished
 This is run on a Macbook M1 ;)
 ### Environment variables
 pg_tps_optimizer supports these environment variables to be used.
+See [docs/connecting.md](docs/connecting.md) for how connection settings, TLS (`sslmode`) and certificates work.
 
 PGHOST=/tmp
 PGUSER=$(id -u -n) # Defaults to current user

@@ -1,0 +1,146 @@
+# Connecting to PostgreSQL
+
+This page describes how pg_tps_optimizer connects to PostgreSQL: where it gets its connection
+settings from, how TLS (`sslmode`) works, and what happens when connecting fails.
+
+pg_tps_optimizer follows the conventions of libpq (the library `psql` uses) where it can, so most
+settings work the way you know from `psql`. Differences are listed explicitly below.
+
+## Connection settings
+
+Connection settings come from three places. Later sources override earlier ones:
+
+1. Built-in defaults
+2. Environment variables
+3. The connection string, given with `--dsn` (`-d`) or the `PGTPSSOURCE` environment variable
+   (`--dsn` wins when both are set)
+
+| Setting | Environment variable | Default |
+|---|---|---|
+| `host` | `PGHOST` | `/tmp` (unix socket) |
+| `port` | `PGPORT` | `5432` |
+| `user` | `PGUSER` | the current OS user |
+| `dbname` | `PGDATABASE` | the user name |
+| `password` | `PGPASSWORD` | empty |
+| `sslmode` | `PGSSLMODE` | `prefer` |
+| `sslcert` | `PGSSLCERT` | `~/.postgresql/postgresql.crt`, if it exists |
+| `sslkey` | `PGSSLKEY` | `~/.postgresql/postgresql.key`, if it exists |
+| `sslrootcert` | `PGSSLROOTCERT` | `~/.postgresql/root.crt`, if it exists |
+
+### Connection string format
+
+The connection string is a space separated list of `key=value` pairs, for example:
+
+```
+pg_tps_optimizer --dsn 'host=db1.example.com port=5432 user=postgres dbname=postgres sslmode=verify-full'
+```
+
+Keep in mind:
+
+- Values can't be quoted and can't contain spaces.
+- URLs (`postgresql://...`) are not supported.
+- `~` is only expanded in environment variables. Use absolute paths for certificate files in the
+  connection string.
+
+### Not supported
+
+- A password file (`~/.pgpass`, `PGPASSFILE`) or service file (`pg_service.conf`, see
+  [#56](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/56)). Use `PGPASSWORD` or
+  `password=` instead.
+- Certificate revocation lists (`sslcrl`, `PGSSLCRL`). An `sslcrl` in the connection string is
+  ignored. Please open an issue if you need it.
+
+## TLS and sslmode
+
+`sslmode` decides whether TLS is used, and how much of the server certificate is checked:
+
+| sslmode | Uses TLS | Checks the server certificate | Server without TLS |
+|---|---|---|---|
+| `disable` | never | – | connects |
+| `allow` | only when connecting without TLS fails | no | connects |
+| `prefer` (default) | when the server supports it | no | connects |
+| `require` | always | no | fails |
+| `verify-ca` | always | signed by the root certificate | fails |
+| `verify-full` | always | signed by the root certificate, and valid for the host name | fails |
+
+Some things to keep in mind:
+
+- **Only `verify-ca` and `verify-full` protect against a man-in-the-middle.** `prefer` and
+  `require` encrypt the connection, but don't check who you are talking to. Use `verify-full` when
+  that matters.
+- **`require` never checks the server certificate**, not even when a root certificate is configured.
+  This differs from libpq, where `require` behaves like `verify-ca` when a root certificate file
+  exists.
+- **`verify-ca` and `verify-full` need a root certificate.** Without one (no `sslrootcert`, and no
+  `~/.postgresql/root.crt`) pg_tps_optimizer stops with an error, before connecting.
+- **`verify-full` checks the host name you connect to** (`host`) against the server certificate.
+  Connecting to `127.0.0.1` with a certificate that is only valid for `localhost` fails.
+- **`allow`** first connects without TLS. Only when that fails (for instance because `pg_hba.conf`
+  only accepts TLS connections) does it try again with TLS. When both fail, the error of the TLS
+  attempt is reported.
+- **Unix sockets never use TLS.** Like libpq, `sslmode` is ignored when `host` is a directory
+  (starts with `/`).
+
+### Client certificates
+
+A client certificate is used when `sslcert` is set (or `~/.postgresql/postgresql.crt` exists), with
+the private key from `sslkey` (or `~/.postgresql/postgresql.key`). This is needed when the server
+uses `cert` authentication in `pg_hba.conf`. The user name must match the common name (CN) of the
+certificate.
+
+Certificates and keys must be PEM files. When a certificate, key or root certificate is set but
+can't be loaded (missing file, wrong format), pg_tps_optimizer stops with an error, instead of
+connecting without it.
+
+### Example: client certificate and verify-full
+
+```
+export PGHOST=db1.example.com
+export PGUSER=postgres
+export PGDATABASE=postgres
+export PGSSLMODE=verify-full
+export PGSSLROOTCERT=/etc/pg_tps_optimizer/root.crt
+export PGSSLCERT=/etc/pg_tps_optimizer/postgres.crt
+export PGSSLKEY=/etc/pg_tps_optimizer/postgres.key
+pg_tps_optimizer
+```
+
+With the container image, pass the same environment variables (one `-e` per variable) and mount
+the certificates:
+
+```
+docker run --rm \
+  -e PGHOST=db1.example.com -e PGUSER=postgres -e PGDATABASE=postgres \
+  -e PGSSLMODE=verify-full \
+  -e PGSSLROOTCERT=/certs/root.crt -e PGSSLCERT=/certs/postgres.crt -e PGSSLKEY=/certs/postgres.key \
+  -v /etc/pg_tps_optimizer:/certs:ro \
+  mannemsolutions/pg_tps_optimizer
+```
+
+## When connecting fails
+
+When pg_tps_optimizer can't connect, it prints a single line starting with `error:` to stderr and
+exits with exit code 1. The line includes the reason PostgreSQL or the TLS library gave, for
+example:
+
+```
+error: connection to server at "localhost", port 5432 failed: error performing TLS handshake: server does not support TLS
+error: root certificate file "~/.postgresql/root.crt" does not exist; either provide the file or change sslmode to disable server certificate verification
+error: connection to server at "localhost", port 5432 failed: error connecting to server: Connection refused (os error 61)
+error: connection to server at "localhost", port 5432 failed: db error: FATAL: database "nope" does not exist
+```
+
+| Message contains | Likely cause |
+|---|---|
+| `server does not support TLS` | `sslmode` is `require` or `verify-*`, but `ssl = off` on the server |
+| `no pg_hba.conf entry ... no encryption` | the server only accepts TLS, but `sslmode` is `disable` |
+| `connection requires a valid client certificate` | `pg_hba.conf` uses `cert`, but no client certificate is configured |
+| `certificate verify failed` | `sslmode=verify-*` and the server certificate isn't signed by the root certificate, or (`verify-full`) isn't valid for the host name |
+| `root certificate file ... does not exist` | `sslmode=verify-*` without a root certificate |
+| `Connection refused` | wrong host or port, or PostgreSQL isn't running |
+
+All errors currently use exit code 1. Separate exit codes per kind of error are planned in
+[#57](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/57).
+
+When a connection of one of the benchmark clients fails during a run, the client logs the error and
+tries to reconnect, without stopping the run.
