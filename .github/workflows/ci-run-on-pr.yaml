@@ -20,6 +20,7 @@ jobs:
     outputs:
       rust: ${{ steps.filter.outputs.rust_any_changed }}
       docker: ${{ steps.filter.outputs.docker_any_changed }}
+      docs: ${{ steps.filter.outputs.docs_any_changed }}
       ci: ${{ steps.filter.outputs.ci_any_changed }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -48,6 +49,11 @@ jobs:
               - '.dockerignore'
               - 'Cargo.toml'
               - 'Cargo.lock'
+            docs:
+              - 'docs/**'
+              - 'mkdocs.yml'
+              - 'mkdocs_overrides/**'
+              - 'docs-requirements.txt'
             ci:
               - '.github/workflows/ci-run-on-pr.yaml'
 
@@ -71,6 +77,30 @@ jobs:
       # clippy also does everything `cargo check` does
       - name: Run cargo clippy
         run: cargo clippy -- -D warnings
+
+  docs:
+    name: Build documentation
+    runs-on: ubuntu-latest
+    needs:
+      - codechanges
+    if: ${{ (needs.codechanges.outputs.docs == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    env:
+      # See the MkDocs 2 / ProperDocs notice: https://properdocs.org/
+      DISABLE_MKDOCS_2_WARNING: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: 3.x
+          cache: pip
+          cache-dependency-path: docs-requirements.txt
+      - name: Install Python dependencies
+        run: pip install -r docs-requirements.txt
+      # Strict: broken links, pages missing from the navigation etc. fail the build
+      - name: Build documentation
+        run: mkdocs build --strict
 
   unit-test:
     name: Run unit tests

@@ -38,3 +38,15 @@ updates:
     commit-message:
       prefix: "build(deps)"
     labels: ["dependencies", "docker"]
+
+  # Python packages to build the docs (docs-requirements.txt)
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    groups:
+      docs:
+        patterns: ["*"]
+    commit-message:
+      prefix: "docs(deps)"
+    labels: ["dependencies", "documentation"]

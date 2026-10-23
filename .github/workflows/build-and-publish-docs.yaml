@@ -1,0 +1,67 @@
+name: Build and publish documentation
+
+# Publishes the docs with mike to the gh-pages branch, which GitHub Pages serves:
+# - a release publishes version X.Y.x (for tag vX.Y.Z), and moves the `latest` alias to it
+# - a manual run publishes the selected branch as version `dev`
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: {}
+
+# Runs push to the same gh-pages branch, so never run two at the same time
+concurrency:
+  group: publish-docs
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish documentation
+    runs-on: ubuntu-latest
+    permissions:
+      # mike pushes the built site to the gh-pages branch
+      contents: write
+    env:
+      # See the MkDocs 2 / ProperDocs notice: https://properdocs.org/
+      DISABLE_MKDOCS_2_WARNING: "true"
+    steps:
+      # The credentials are kept on purpose: mike pushes to gh-pages with them
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      # mike adds a commit to gh-pages, which doesn't exist before the first publish
+      - name: Fetch gh-pages branch
+        run: git fetch origin gh-pages --depth=1 || echo "No gh-pages branch yet"
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: 3.x
+          cache: pip
+          cache-dependency-path: docs-requirements.txt
+
+      - name: Install Python dependencies
+        run: pip install -r docs-requirements.txt
+
+      - name: Configure Git user
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+      - name: Publish release documentation
+        if: github.event_name == 'release'
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          # v1.2.3 -> 1.2.x: patch releases update the docs of their minor version
+          VERSION="$(echo "${TAG#v}" | sed -E 's/^([0-9]+\.[0-9]+).*/\1.x/')"
+          mike deploy --push --update-aliases "${VERSION}" latest
+          mike set-default --push latest
+
+      - name: Publish development documentation
+        if: github.event_name == 'workflow_dispatch'
+        run: mike deploy --push dev
+
+      - name: List published versions
+        run: mike list
