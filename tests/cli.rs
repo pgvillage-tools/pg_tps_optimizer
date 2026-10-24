@@ -96,3 +96,33 @@ fn draws_graph_from_json_reports() {
     assert_eq!(output.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&output.stderr).contains("is not a JSON report"));
 }
+
+// Exit codes that need no PostgreSQL (see docs/users-guide/usage.md#exit-codes)
+#[test]
+fn exits_with_distinct_codes() {
+    let run = |args: &[&str]| {
+        let output = Command::new(env!("CARGO_BIN_EXE_pg_tps_optimizer"))
+            .env("HOME", "/nonexistent")
+            .env_remove("PGSSLMODE")
+            .args(args)
+            .output()
+            .unwrap();
+        (
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr).to_string(),
+        )
+    };
+    // 2: invalid options or connection settings
+    for args in [
+        &["--spread", "abc"][..],
+        &["--max-wait", "abc"],
+        &["--dsn", "host"],
+        &["--dsn", "host=localhost sslmode=bogus"],
+    ] {
+        let (code, stderr) = run(args);
+        assert_eq!(code, Some(2), "{:?}: {}", args, stderr);
+    }
+    // 3: the server can't be reached (nothing listens on port 1)
+    let (code, stderr) = run(&["--dsn", "host=127.0.0.1 port=1 sslmode=disable"]);
+    assert_eq!(code, Some(3), "{}", stderr);
+}

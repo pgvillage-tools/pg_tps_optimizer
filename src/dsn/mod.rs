@@ -1,3 +1,4 @@
+use crate::exit::{self, Failure};
 use crate::generic;
 
 mod conninfo;
@@ -332,15 +333,20 @@ impl Dsn {
     // Connect like libpq would for the configured sslmode. The postgres crate only knows
     // disable, prefer and require, so allow, verify-ca and verify-full are built from those, and
     // the certificate checks are configured on the TLS connector.
+    // Connect, with errors that carry the exit code: invalid settings are exit::USAGE, a server
+    // that can't be reached (or TLS that fails) exit::UNREACHABLE, and a server that refuses the
+    // connection exit::REJECTED
     pub fn client(&self) -> Result<Client, Box<dyn Error>> {
+        let usage = |message: String| Box::new(Failure::new(exit::USAGE, message));
         if let Some(err) = self.invalid.first() {
-            return Err(err.to_string().into());
+            return Err(usage(err.to_string()));
         }
         let mut config: Config = self
             .cleanse()
             .to_string()
             .parse()
-            .map_err(|e: postgres::Error| error_chain(&e))?;
+            .map_err(|e: postgres::Error| usage(error_chain(&e)))?;
+        let tls = || self.tls_connector().map_err(|e| usage(e.to_string()));
         // Like libpq, sslmode is ignored for unix sockets. The postgres crate uses one sslmode
         // for all hosts, so a mix of unix sockets and TCP hosts can't skip TLS for the sockets
         // only, and must not drop TLS for the TCP hosts.
@@ -351,12 +357,11 @@ impl Dsn {
         } else if sockets > 0
             && ["require", "verify-ca", "verify-full"].contains(&self.ssl_mode.as_str())
         {
-            return Err(format!(
+            return Err(usage(format!(
                 "host \"{}\" mixes unix sockets and TCP hosts, which is not supported with \
                  sslmode={}",
                 host, self.ssl_mode
-            )
-            .into());
+            )));
         } else {
             self.ssl_mode.as_str()
         };
@@ -365,26 +370,27 @@ impl Dsn {
             // First try without TLS, and only with TLS when that fails
             "allow" => match config.clone().ssl_mode(SslMode::Disable).connect(NoTls) {
                 Ok(client) => Ok(client),
-                Err(_) => config
-                    .ssl_mode(SslMode::Require)
-                    .connect(self.tls_connector()?),
+                Err(_) => config.ssl_mode(SslMode::Require).connect(tls()?),
             },
-            "prefer" => config
-                .ssl_mode(SslMode::Prefer)
-                .connect(self.tls_connector()?),
-            "require" | "verify-ca" | "verify-full" => config
-                .ssl_mode(SslMode::Require)
-                .connect(self.tls_connector()?),
-            other => return Err(format!("invalid sslmode value: \"{}\"", other).into()),
+            "prefer" => config.ssl_mode(SslMode::Prefer).connect(tls()?),
+            "require" | "verify-ca" | "verify-full" => {
+                config.ssl_mode(SslMode::Require).connect(tls()?)
+            }
+            other => return Err(usage(format!("invalid sslmode value: \"{}\"", other))),
         };
         result.map_err(|e| {
-            format!(
+            // An error from the server means it refused the connection
+            let code = match e.as_db_error() {
+                Some(_) => exit::REJECTED,
+                None => exit::UNREACHABLE,
+            };
+            let message = format!(
                 "connection to server at \"{}\", port {} failed: {}",
                 self.get_value("host", ""),
                 self.get_value("port", ""),
                 error_chain(&e)
-            )
-            .into()
+            );
+            Box::new(Failure::new(code, message)) as Box<dyn Error>
         })
     }
     fn tls_connector(&self) -> Result<MakeTlsConnector, Box<dyn Error>> {
