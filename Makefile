@@ -11,8 +11,11 @@ unittest:
 	cargo test
 
 # Needs docker (or podman with its docker socket)
+# Every e2e test runs a benchmark at full load against its own container, so limit how many run at
+# the same time (the default is one per CPU core of the host, not of the docker/podman VM)
+E2E_THREADS ?= 8
 integrationtest:
-	cargo test --test e2e -- --ignored
+	cargo test --test e2e -- --ignored --test-threads=$(E2E_THREADS)
 
 coverage:
 	./unittests.sh

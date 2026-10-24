@@ -153,6 +153,7 @@ fn uses_password_file() {
     // A server with password authentication (scram-sha-256), password "postgres"
     let pg = Postgres::default()
         .with_tag(pg_version())
+        .with_startup_timeout(STARTUP_TIMEOUT)
         .start()
         .expect("could not start postgres container");
     let port = pg.get_host_port_ipv4(5432).unwrap().to_string();
