@@ -1,10 +1,34 @@
-// Draws a PNG with the TPS per number of clients: one line per run
+// Draws a graph (PNG or SVG) with the TPS per number of clients: one line per run
 use super::Step;
+use clap::ValueEnum;
+use plotters::coord::Shift;
 use plotters::prelude::*;
 use plotters::style::{register_font, FontStyle};
 use std::error::Error;
 use std::path::Path;
 use std::sync::Once;
+
+#[derive(Clone, Copy, Debug, PartialEq, ValueEnum)]
+pub enum GraphFormat {
+    /// SVG when the file name ends with .svg, otherwise PNG
+    Auto,
+    Png,
+    Svg,
+}
+
+impl GraphFormat {
+    fn resolve(self, path: &Path) -> GraphFormat {
+        match self {
+            GraphFormat::Auto => match path.extension() {
+                Some(ext) if ext.eq_ignore_ascii_case("svg") => GraphFormat::Svg,
+                _ => GraphFormat::Png,
+            },
+            format => format,
+        }
+    }
+}
+
+const SIZE: (u32, u32) = (900, 600);
 
 pub struct Series {
     pub name: String,
@@ -20,9 +44,22 @@ fn register_fonts() {
     });
 }
 
-pub fn draw(path: &Path, series: &[Series]) -> Result<(), Box<dyn Error>> {
+pub fn draw(path: &Path, format: GraphFormat, series: &[Series]) -> Result<(), Box<dyn Error>> {
+    // Also an SVG needs the font: to measure the text for the layout
     register_fonts();
+    match format.resolve(path) {
+        GraphFormat::Svg => draw_on(&SVGBackend::new(path, SIZE).into_drawing_area(), series),
+        _ => draw_on(&BitMapBackend::new(path, SIZE).into_drawing_area(), series),
+    }
+}
 
+fn draw_on<DB: DrawingBackend>(
+    root: &DrawingArea<DB, Shift>,
+    series: &[Series],
+) -> Result<(), Box<dyn Error>>
+where
+    DB::ErrorType: 'static,
+{
     // The numbers of clients of all runs, evenly spaced on the x axis (like 1, 2, 3, 5, 8, ...)
     let mut clients: Vec<u32> = series
         .iter()
@@ -38,9 +75,8 @@ pub fn draw(path: &Path, series: &[Series]) -> Result<(), Box<dyn Error>> {
         .flat_map(|s| s.steps.iter().filter_map(|step| step.tps))
         .fold(0.0_f64, f64::max);
 
-    let root = BitMapBackend::new(path, (900, 600)).into_drawing_area();
     root.fill(&WHITE)?;
-    let mut chart = ChartBuilder::on(&root)
+    let mut chart = ChartBuilder::on(root)
         .caption("Measured TPS over number of clients", ("sans-serif", 24))
         .margin(15)
         .x_label_area_size(50)
@@ -132,12 +168,22 @@ mod tests {
                 steps: vec![step(1, Some(900.0)), step(5, Some(2500.0))],
             },
         ];
-        draw(&file, &series).unwrap();
+        draw(&file, GraphFormat::Auto, &series).unwrap();
         let png = std::fs::read(&file).unwrap();
         assert_eq!(&png[1..4], b"PNG");
         std::fs::remove_file(&file).unwrap();
 
-        let err = draw(&file, &[]).unwrap_err();
+        // SVG by extension, or explicitly
+        let svg_file = file.with_extension("svg");
+        draw(&svg_file, GraphFormat::Auto, &series).unwrap();
+        let svg = std::fs::read_to_string(&svg_file).unwrap();
+        assert!(svg.starts_with("<svg") && svg.contains("run 2"), "{}", svg);
+        std::fs::remove_file(&svg_file).unwrap();
+        draw(&file, GraphFormat::Svg, &series).unwrap();
+        assert!(std::fs::read_to_string(&file).unwrap().starts_with("<svg"));
+        std::fs::remove_file(&file).unwrap();
+
+        let err = draw(&file, GraphFormat::Auto, &[]).unwrap_err();
         assert_eq!(err.to_string(), "no results to draw a graph of");
     }
 }
