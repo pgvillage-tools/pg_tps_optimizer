@@ -985,13 +985,20 @@ built into all binaries; you don't need to install it.</p>
 <p>Releases up to v0.2.7 only have a Linux x86_64 build, as a zip file.</p>
 </div>
 <h2 id="container-image">Container image<a class="headerlink" href="#container-image" title="Permanent link">&para;</a></h2>
-<p>The image <code>mannemsolutions/pg_tps_optimizer</code> on Docker Hub runs pg_tps_optimizer as its entrypoint,
-for <code>linux/amd64</code> and <code>linux/arm64</code>. Arguments after the image name are passed to
-pg_tps_optimizer, and settings can be passed as environment variables (one <code>-e</code> per variable):</p>
+<p>The image <code>ghcr.io/pgvillage-tools/pg_tps_optimizer</code> on the GitHub Container Registry runs
+pg_tps_optimizer as its entrypoint, for <code>linux/amd64</code> and <code>linux/arm64</code>. Every release is tagged
+with its version (like <code>v0.3.1</code>), and the newest release with <code>latest</code>. Arguments after the image
+name are passed to pg_tps_optimizer, and settings can be passed as environment variables (one <code>-e</code>
+per variable):</p>
 <div class="language-text highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>docker run --rm \
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>  -e PGHOST=db1.example.com -e PGUSER=postgres -e PGPASSWORD=secret \
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  mannemsolutions/pg_tps_optimizer --range 200
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>  ghcr.io/pgvillage-tools/pg_tps_optimizer --range 200
 </code></pre></div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>Releases up to v0.2.7 were published on Docker Hub, as <code>mannemsolutions/pg_tps_optimizer</code>
+(only for <code>linux/amd64</code>). v0.3.0 has no container image.</p>
+</div>
 <p>To use certificates, mount them into the container; see
 <a href="../connecting/#example-client-certificate-and-verify-full">Connecting to PostgreSQL</a>.</p>
 <h2 id="build-from-source">Build from source<a class="headerlink" href="#build-from-source" title="Permanent link">&para;</a></h2>

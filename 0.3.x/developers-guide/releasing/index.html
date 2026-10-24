@@ -1019,7 +1019,8 @@ starts:</p>
 <li>builds the binaries for Linux (x86_64, ARM64) and macOS (Intel, Apple silicon), and attaches
   them to the release with their checksums</li>
 <li>builds the container image for <code>linux/amd64</code> and <code>linux/arm64</code> on native runners, and pushes
-  it to Docker Hub (<code>mannemsolutions/pg_tps_optimizer</code>) with the version tags</li>
+  it to the GitHub Container Registry (<code>ghcr.io/pgvillage-tools/pg_tps_optimizer</code>) with the
+  version tag and <code>latest</code>, using the <code>GITHUB_TOKEN</code> of the workflow (no secrets needed)</li>
 </ul>
 </li>
 <li><strong>build-and-publish-docs.yaml</strong>: publishes the docs for version <code>X.Y.x</code> (patch releases update
