@@ -31,15 +31,24 @@ starts its own PostgreSQL container, and removes it when it finishes.
 - The binary runs with only the `PG*` environment variables of the test, and `HOME` set to an empty
   directory, so your own settings and `~/.postgresql` don't influence the tests.
 
-The tests are split per subject, one module each: `sslmode.rs` (sslmode, TLS and certificates),
-`connection.rs` (connection strings, environment variables, service files) and `workload.rs`
-(transactional and prepared modes), with shared helpers in `common.rs`. Add the tests of a new
-feature to the module of its subject, or a new module (listed in `tests/e2e/main.rs`), so parallel
-pull requests don't all change the same file.
+The tests are split per subject, one module each, with shared helpers in `common.rs`:
+
+| Module | Subject |
+|---|---|
+| `sslmode.rs` | sslmode, TLS and certificates |
+| `connection.rs` | connection strings, environment variables, service files and the password file |
+| `config.rs` | the config file (`--config`) |
+| `workload.rs` | the default workload, `--query`, and the transactional and prepared modes |
+| `output.rs` | JSON output and graphs |
+| `exit_codes.rs` | the exit code per kind of error |
+
+Add the tests of a new feature to the module of its subject, or a new module (listed in
+`tests/e2e/main.rs`), so parallel pull requests don't all change the same file.
 
 The tests cover every `sslmode` against a server with and without TLS (see the
 [connection behaviour](../users-guide/connecting.md#connection-behaviour)), client certificates,
-connection strings, environment variables and service files.
+connection strings, environment variables, service files, the config file, the workloads, the
+output formats and the exit codes.
 
 ## Linting
 
@@ -71,8 +80,8 @@ files they depend on changed:
 
 | Job | Runs when |
 |---|---|
-| Rustfmt and Clippy, Run unit tests | Rust code, `Cargo.toml`/`Cargo.lock` or tests changed |
-| Run e2e tests (PostgreSQL 14 ... 18) | the same, after the unit tests passed |
+| Rustfmt and Clippy, Run unit tests, Security audit (cargo audit) | Rust code, `Cargo.toml`/`Cargo.lock` or tests changed |
+| Run e2e tests (PostgreSQL 14 ... 18) | the same, after the unit tests passed; Run e2e tests (testcontainers) sums up their results |
 | Build docker image (amd64, arm64) | `Containerfile`, `.dockerignore`, `Cargo.toml` or `Cargo.lock` changed |
 | Build documentation | `docs/`, `mkdocs.yml`, `mkdocs_overrides/` or `docs-requirements.txt` changed |
 
