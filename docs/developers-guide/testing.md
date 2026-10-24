@@ -25,6 +25,15 @@ make integrationtest
 They need docker, or podman with its docker socket (`podman machine start` on macOS). Every test
 starts its own PostgreSQL container, and removes it when it finishes.
 
+Every test also runs a benchmark at full load, so the tests put a lot of load on the container
+runtime:
+
+- `make integrationtest` runs at most 8 tests at the same time (`make integrationtest
+  E2E_THREADS=4` for fewer); plain `cargo test` runs one per CPU core of the host.
+- A test container gets 3 minutes to start. When many tests fail with `StartupTimeout` (or a
+  podman/docker error), the container runtime was too busy or got stuck: give its VM more
+  resources (`podman machine set --cpus 8 --memory 4096`), or run the tests again.
+
 - `PGVERSION` selects the PostgreSQL version (the `postgres` image tag), default `18`:
   `PGVERSION=14 cargo test --test e2e -- --ignored`
 - The tests generate their own certificates (CA, server and client) with `rcgen`.

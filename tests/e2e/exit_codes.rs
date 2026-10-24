@@ -13,6 +13,7 @@ fn exits_with_distinct_codes_for_connection_errors() {
     // A server with password authentication (scram-sha-256), password "postgres"
     let pg = Postgres::default()
         .with_tag(pg_version())
+        .with_startup_timeout(STARTUP_TIMEOUT)
         .start()
         .expect("could not start postgres container");
     let home = scratch_dir("exits_with_distinct_codes_for_connection_errors").join("home");
