@@ -12,7 +12,7 @@ runtime.
 
 ## End-to-end tests
 
-The end-to-end tests in `tests/e2e.rs` start PostgreSQL in containers with
+The end-to-end tests in `tests/e2e/` start PostgreSQL in containers with
 [testcontainers](https://github.com/testcontainers/testcontainers-rs), and run the
 `pg_tps_optimizer` binary against them:
 
@@ -30,6 +30,12 @@ starts its own PostgreSQL container, and removes it when it finishes.
 - The tests generate their own certificates (CA, server and client) with `rcgen`.
 - The binary runs with only the `PG*` environment variables of the test, and `HOME` set to an empty
   directory, so your own settings and `~/.postgresql` don't influence the tests.
+
+The tests are split per subject, one module each: `sslmode.rs` (sslmode, TLS and certificates),
+`connection.rs` (connection strings, environment variables, service files) and `workload.rs`
+(transactional and prepared modes), with shared helpers in `common.rs`. Add the tests of a new
+feature to the module of its subject, or a new module (listed in `tests/e2e/main.rs`), so parallel
+pull requests don't all change the same file.
 
 The tests cover every `sslmode` against a server with and without TLS (see the
 [connection behaviour](../users-guide/connecting.md#connection-behaviour)), client certificates,
