@@ -27,7 +27,7 @@ Connection settings come from four places. Later sources override earlier ones, 
 | `sslmode` | `PGSSLMODE` | `prefer` |
 | `sslcert` | `PGSSLCERT` | `~/.postgresql/postgresql.crt`, if it exists |
 | `sslkey` | `PGSSLKEY` | `~/.postgresql/postgresql.key`, if it exists |
-| `sslrootcert` | `PGSSLROOTCERT` | `~/.postgresql/root.crt`, if it exists |
+| `sslrootcert` | `PGSSLROOTCERT` | `~/.postgresql/root.crt`, if it exists; `system` for the CAs of the operating system |
 | `application_name` | `PGAPPNAME` | not set |
 | `options` | `PGOPTIONS` | not set |
 | `connect_timeout` | `PGCONNECT_TIMEOUT` | no timeout |
@@ -125,7 +125,15 @@ Some things to keep in mind:
   certificate from that CA is accepted. That is only safe when the CA signs nothing but your
   PostgreSQL servers. `verify-full` also checks the host name.
 - **Only `sslrootcert` is trusted.** `verify-ca` and `verify-full` don't trust the CAs of the
-  operating system, only the root certificate(s) in `sslrootcert` (or `~/.postgresql/root.crt`).
+  operating system, only the root certificate(s) in `sslrootcert` (or `~/.postgresql/root.crt`),
+  unless `sslrootcert` is `system` (see below).
+- **`sslrootcert=system`** trusts the CAs of the operating system instead of a root certificate
+  file, like in libpq 16 and newer. Use it for a server with a certificate from a public CA.
+    - Any public CA can issue a certificate, so it requires `verify-full`: that's the default with
+      `sslrootcert=system`, and a weaker `sslmode` gives an error.
+    - The CAs are found in `SSL_CERT_FILE` / `SSL_CERT_DIR` when set, otherwise in the usual
+      locations, like `/etc/ssl/certs`, `/etc/pki/tls` or `/etc/ssl/cert.pem` (macOS).
+    - The container image has no CA certificates: mount them and set `SSL_CERT_FILE`.
 - **`require` never checks the server certificate**, not even when a root certificate is configured.
   This differs from libpq, where `require` behaves like `verify-ca` when a root certificate file
   exists.
@@ -234,6 +242,8 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `connection requires a valid client certificate` | `pg_hba.conf` uses `cert`, but no client certificate is configured |
 | `certificate verify failed` | `sslmode=verify-*` and the server certificate isn't signed by the root certificate, or (`verify-full`) isn't valid for the host name |
 | `root certificate file ... does not exist` | `sslmode=verify-*` without a root certificate |
+| `weak sslmode ... may not be used with sslrootcert=system` | `sslrootcert=system` with an `sslmode` other than `verify-full` |
+| `sslrootcert=system: no certificates of the OS found` | no CA certificates in the usual locations (for instance in the container): set `SSL_CERT_FILE` or `SSL_CERT_DIR` |
 | `sslkey is set, but sslcert is not` (or the other way around) | only one of the client certificate and key is configured, or only one of the default files in `~/.postgresql` exists |
 | `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |
 | `definition of service ... not found` | `service` or `PGSERVICE` names a service that is not in any [service file](#service-files) |
