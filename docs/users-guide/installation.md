@@ -48,7 +48,7 @@ docker run --rm \
 
 !!! note
     Releases up to v0.2.7 were published on Docker Hub, as `mannemsolutions/pg_tps_optimizer`
-    (only for `linux/amd64`). v0.3.0 has no container image.
+    (only for `linux/amd64`).
 
 To use certificates, mount them into the container; see
 [Connecting to PostgreSQL](connecting.md#example-client-certificate-and-verify-full).
