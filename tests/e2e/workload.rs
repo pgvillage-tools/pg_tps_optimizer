@@ -149,6 +149,8 @@ fn runs_a_custom_query() {
         let run =
             run_pg_tps_optimizer(&home, &query_env(&pg, &[("PGTPSQUERY", query.to_string())]));
         run.assert_clean_failure();
+        // An invalid query is an invalid option: exit code 2
+        assert_eq!(run.output.status.code(), Some(2), "{}", run.describe());
         let stderr = String::from_utf8_lossy(&run.output.stderr).to_string();
         assert!(
             stderr.contains("invalid query") && stderr.contains(error),
