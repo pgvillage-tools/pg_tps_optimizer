@@ -50,6 +50,54 @@ A `*` before the TPS means the step didn't become stable within `--max-wait`: th
 mean of the last samples, but they varied more than `--spread`. More clients, or a busy server,
 usually need more time; try a larger `--max-wait`.
 
+## JSON output
+
+With `--output json` (or `PGTPSOUTPUT=json`), pg_tps_optimizer prints one JSON document at the end
+of the run, instead of the table. The progress messages (`Initializing`, the settings, `Finished`)
+go to stderr, so stdout only has the JSON:
+
+```
+pg_tps_optimizer --output json > results.json
+```
+
+```json
+{
+  "version": "0.3.0",
+  "settings": {
+    "min_clients": 1,
+    "max_clients": 200,
+    "max_wait_seconds": 10,
+    "min_samples": 10,
+    "spread": 10.0,
+    "transactional": false,
+    "prepared": false
+  },
+  "steps": [
+    {
+      "timestamp": "2026-10-24T07:49:41.123456+02:00",
+      "clients": 1,
+      "stable": true,
+      "tps": 4013.761,
+      "latency_us": 498.0,
+      "tps_per_latency": 8.06,
+      "postgres_tps": 3655.436,
+      "wal_kb_per_sec": 263.2
+    }
+  ]
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `version` | The version of pg_tps_optimizer |
+| `settings` | The settings of the run: the range of clients, `--max-wait` (in seconds), `--min-samples`, `--spread`, `--transactional` and `--prepared` |
+| `steps` | One entry per step, in the order they ran |
+| `timestamp` | When the step finished (RFC 3339, local time) |
+| `clients`, `tps`, `latency_us`, `tps_per_latency`, `postgres_tps`, `wal_kb_per_sec` | The columns of the table (see [Columns](#columns)) |
+| `stable` | `false` for a step that didn't become stable within `--max-wait` (the `*` in the table) |
+
+When a step got no samples at all (shown as `?` in the table), its measurements are `null`.
+
 ## Interpreting the results
 
 In the example above (PostgreSQL 18 in a small virtual machine):
