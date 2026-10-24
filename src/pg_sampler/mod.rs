@@ -4,6 +4,7 @@ The main idea is to get the number of transactions and de amount of WAL.
 We also capture the duration between 2 samples, and as such also know TPS and WAL per sec.
 */
 use crate::dsn::Dsn;
+use crate::exit::{self, Failure};
 use crate::threader::workload::{client_params, Workload, TABLE_NAME};
 use chrono::Utc;
 use postgres::{Client, Error, Statement};
@@ -39,15 +40,17 @@ impl PgSampler {
         if workload.is_default() {
             return Ok(());
         }
+        // An invalid query is an invalid option: exit::USAGE
+        let invalid =
+            |message: &str| Failure::new(exit::USAGE, format!("invalid query: {}", message));
         let statement = self.client.prepare(&workload.query()).map_err(|e| {
-            format!(
-                "invalid query: {}",
+            invalid(
                 e.as_db_error()
                     .map(|e| e.message())
-                    .unwrap_or(&e.to_string())
+                    .unwrap_or(&e.to_string()),
             )
         })?;
-        client_params(statement.params(), 0).map_err(|e| format!("invalid query: {}", e))?;
+        client_params(statement.params(), 0).map_err(|e| invalid(&e))?;
         Ok(())
     }
     // Remove the table of the default workload after the run. Clients that are still finishing

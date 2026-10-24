@@ -104,7 +104,7 @@ pg_tps_optimizer --query 'insert into events (client) values ($1)'
   like `$1::int`. The query doesn't need to use `$1`.
 - Only `$1` is supported; a query with `$2` or more gives an error.
 - The query is checked before the clients start, so a typo stops pg_tps_optimizer with
-  `error: invalid query: ...`.
+  `error: invalid query: ...` (exit code 2).
 - Rows a query returns are read, but not used.
 
 With `--transactional`, every query runs in its own transaction (`begin`, query, `commit`). With
@@ -145,7 +145,7 @@ error it was, so scripts can react to it:
 |---|---|---|
 | 0 | The run finished | |
 | 1 | An error during the run | a query fails after connecting |
-| 2 | Invalid options, environment variables, config file or connection settings: fix the command | `--spread abc`, an invalid `--max-wait`, an unknown key in the config file, an invalid connection string or `sslmode`, a missing certificate file, an unknown service |
+| 2 | Invalid options, environment variables, config file or connection settings: fix the command | `--spread abc`, an invalid `--max-wait` or `--query`, an unknown key in the config file, an invalid connection string or `sslmode`, a missing certificate file, an unknown service |
 | 3 | The server can't be reached, or TLS fails | a wrong host or port, `Connection refused`, a time-out, `sslmode=require` against a server without TLS, a server certificate that doesn't verify |
 | 4 | The server refuses the connection | a wrong password, no matching line in `pg_hba.conf`, a database that doesn't exist, too many connections |
 
