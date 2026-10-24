@@ -38,7 +38,8 @@ starts:
     - builds the binaries for Linux (x86_64, ARM64) and macOS (Intel, Apple silicon), and attaches
       them to the release with their checksums
     - builds the container image for `linux/amd64` and `linux/arm64` on native runners, and pushes
-      it to Docker Hub (`mannemsolutions/pg_tps_optimizer`) with the version tags
+      it to the GitHub Container Registry (`ghcr.io/pgvillage-tools/pg_tps_optimizer`) with the
+      version tag and `latest`, using the `GITHUB_TOKEN` of the workflow (no secrets needed)
 2. **build-and-publish-docs.yaml**: publishes the docs for version `X.Y.x` (patch releases update
    their minor version) and moves `latest` to it
 

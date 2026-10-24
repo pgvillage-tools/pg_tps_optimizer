@@ -206,7 +206,7 @@ docker run --rm \
   -e PGSSLMODE=verify-full \
   -e PGSSLROOTCERT=/certs/root.crt -e PGSSLCERT=/certs/postgres.crt -e PGSSLKEY=/certs/postgres.key \
   -v /etc/pg_tps_optimizer:/certs:ro \
-  mannemsolutions/pg_tps_optimizer
+  ghcr.io/pgvillage-tools/pg_tps_optimizer
 ```
 
 ## Connection behaviour

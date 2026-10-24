@@ -127,7 +127,7 @@ The same with environment variables, for instance in a container:
 docker run --rm \
   -e PGHOST=db1.example.com -e PGUSER=postgres -e PGDATABASE=postgres -e PGPASSWORD=secret \
   -e PGTPSRANGE=200 -e PGTPSMINSAMPLES=20 -e PGTPSSPREAD=5 -e PGTPSMAXWAIT=20s \
-  mannemsolutions/pg_tps_optimizer
+  ghcr.io/pgvillage-tools/pg_tps_optimizer
 ```
 
 Start at 8 clients, for a server you know can handle that:
