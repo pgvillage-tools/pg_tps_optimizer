@@ -610,7 +610,6 @@ fn sslmode_allow_uses_plain_when_possible() {
     check_transport("sslmode_allow_uses_plain_when_possible", "allow", false);
 }
 
-
 // With --prepared, every client prepares the update once, and executes it for every query. The
 // postgres crate gives every prepared statement its own name (s0, s1, ...), so the server log
 // shows one statement name per client.
