@@ -1,0 +1,1682 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Find the number of clients that gives PostgreSQL the maximum TPS with minimal latency">
+      
+      
+      
+        <link rel="canonical" href="https://pgvillage-tools.github.io/pg_tps_optimizer/dev/users-guide/connecting/">
+      
+      
+        <link rel="prev" href="../results/">
+      
+      
+        <link rel="next" href="../../developers-guide/building/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/pg_tps_optimizer_logo.png">
+      <meta name="generator" content="mkdocs-ProperDocs 1.6.7, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Connecting to PostgreSQL - pg_tps_optimizer</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        
+        <link rel="stylesheet" href="../../assets/external/fonts.googleapis.com/css.49ea35f2.css">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#connecting-to-postgresql" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  You're not viewing the latest version.
+  <a href="../../..">
+    <strong>Click here to go to latest.</strong>
+  </a>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL("../.."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="pg_tps_optimizer" class="md-header__button md-logo" aria-label="pg_tps_optimizer" data-md-component="logo">
+      
+  <img src="../../assets/pg_tps_optimizer_logo.svg" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            pg_tps_optimizer
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Connecting to PostgreSQL
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/pgvillage-tools/pg_tps_optimizer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pgvillage-tools/pg_tps_optimizer
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="pg_tps_optimizer" class="md-nav__button md-logo" aria-label="pg_tps_optimizer" data-md-component="logo">
+      
+  <img src="../../assets/pg_tps_optimizer_logo.svg" alt="logo">
+
+    </a>
+    pg_tps_optimizer
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/pgvillage-tools/pg_tps_optimizer" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    pgvillage-tools/pg_tps_optimizer
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    User guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Usage
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../results/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Reading the results
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to PostgreSQL
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#connection-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connection-string-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection string format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#password-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tls-and-sslmode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS and sslmode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TLS and sslmode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#client-certificates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client certificates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-client-certificate-and-verify-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: client certificate and verify-full
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connection-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-connecting-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When connecting fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Developer guide
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Developer guide
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developers-guide/building/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developers-guide/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../developers-guide/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    About
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    About
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../about/license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+  
+
+<nav class="md-nav md-nav--secondary" aria-label="On this page">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      On this page
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#connection-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection settings
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Connection settings">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connection-string-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection string format
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#service-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Service files
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#password-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Password file
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#not-supported" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Not supported
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tls-and-sslmode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TLS and sslmode
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="TLS and sslmode">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#client-certificates" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Client certificates
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-client-certificate-and-verify-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example: client certificate and verify-full
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#connection-behaviour" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connection behaviour
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#when-connecting-fails" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        When connecting fails
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href="../.." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Home
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../installation/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    User guide
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/pgvillage-tools/pg_tps_optimizer/edit/main/docs/users-guide/connecting.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="connecting-to-postgresql">Connecting to PostgreSQL<a class="headerlink" href="#connecting-to-postgresql" title="Permanent link">&para;</a></h1>
+<p>This page describes how pg_tps_optimizer connects to PostgreSQL: where it gets its connection
+settings from, how TLS (<code>sslmode</code>) works, and what happens when connecting fails.</p>
+<p>pg_tps_optimizer follows the conventions of libpq (the library <code>psql</code> uses) where it can, so most
+settings work the way you know from <code>psql</code>. Differences are listed explicitly below.</p>
+<h2 id="connection-settings">Connection settings<a class="headerlink" href="#connection-settings" title="Permanent link">&para;</a></h2>
+<p>Connection settings come from four places. Later sources override earlier ones, like in libpq:</p>
+<ol>
+<li>Built-in defaults</li>
+<li>Environment variables</li>
+<li>A service from a <a href="#service-files">service file</a>, when <code>service</code> or <code>PGSERVICE</code> is set</li>
+<li>The connection string, given with <code>--dsn</code> (<code>-d</code>) or the <code>PGTPSSOURCE</code> environment variable
+   (<code>--dsn</code> wins when both are set)</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Environment variable</th>
+<th>Default</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>host</code></td>
+<td><code>PGHOST</code></td>
+<td><code>hostaddr</code> when that is set; otherwise the unix socket directory with a running server for <code>port</code>: <code>/var/run/postgresql</code> or <code>/tmp</code> (<code>/tmp</code> when neither has one)</td>
+</tr>
+<tr>
+<td><code>hostaddr</code></td>
+<td><code>PGHOSTADDR</code></td>
+<td>not set</td>
+</tr>
+<tr>
+<td><code>port</code></td>
+<td><code>PGPORT</code></td>
+<td><code>5432</code></td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td><code>PGUSER</code></td>
+<td>the current OS user</td>
+</tr>
+<tr>
+<td><code>dbname</code></td>
+<td><code>PGDATABASE</code></td>
+<td>the user name</td>
+</tr>
+<tr>
+<td><code>password</code></td>
+<td><code>PGPASSWORD</code></td>
+<td>from the <a href="#password-file">password file</a>, if a line matches</td>
+</tr>
+<tr>
+<td><code>passfile</code></td>
+<td><code>PGPASSFILE</code></td>
+<td><code>~/.pgpass</code></td>
+</tr>
+<tr>
+<td><code>sslmode</code></td>
+<td><code>PGSSLMODE</code></td>
+<td><code>prefer</code></td>
+</tr>
+<tr>
+<td><code>sslcert</code></td>
+<td><code>PGSSLCERT</code></td>
+<td><code>~/.postgresql/postgresql.crt</code>, if it exists</td>
+</tr>
+<tr>
+<td><code>sslkey</code></td>
+<td><code>PGSSLKEY</code></td>
+<td><code>~/.postgresql/postgresql.key</code>, if it exists</td>
+</tr>
+<tr>
+<td><code>sslrootcert</code></td>
+<td><code>PGSSLROOTCERT</code></td>
+<td><code>~/.postgresql/root.crt</code>, if it exists; <code>system</code> for the CAs of the operating system</td>
+</tr>
+<tr>
+<td><code>application_name</code></td>
+<td><code>PGAPPNAME</code></td>
+<td>not set</td>
+</tr>
+<tr>
+<td><code>options</code></td>
+<td><code>PGOPTIONS</code></td>
+<td>not set</td>
+</tr>
+<tr>
+<td><code>connect_timeout</code></td>
+<td><code>PGCONNECT_TIMEOUT</code></td>
+<td>no timeout</td>
+</tr>
+<tr>
+<td><code>target_session_attrs</code></td>
+<td><code>PGTARGETSESSIONATTRS</code></td>
+<td><code>any</code> (also <code>read-write</code>, <code>read-only</code>)</td>
+</tr>
+<tr>
+<td><code>channel_binding</code></td>
+<td><code>PGCHANNELBINDING</code></td>
+<td><code>prefer</code></td>
+</tr>
+<tr>
+<td><code>load_balance_hosts</code></td>
+<td><code>PGLOADBALANCEHOSTS</code></td>
+<td><code>disable</code></td>
+</tr>
+<tr>
+<td><code>sslnegotiation</code></td>
+<td><code>PGSSLNEGOTIATION</code></td>
+<td><code>postgres</code></td>
+</tr>
+</tbody>
+</table>
+<p>Other settings the PostgreSQL driver supports (<code>tcp_user_timeout</code>, <code>keepalives</code>, <code>keepalives_idle</code>,
+<code>keepalives_interval</code>, <code>keepalives_retries</code>) can be set in the connection string; libpq has no
+environment variables for them either.</p>
+<h3 id="connection-string-format">Connection string format<a class="headerlink" href="#connection-string-format" title="Permanent link">&para;</a></h3>
+<p>The connection string uses the same formats as libpq: <code>key=value</code> pairs, or a URI.</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pg_tps_optimizer --dsn 'host=db1.example.com port=5432 user=postgres dbname=postgres sslmode=verify-full'
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pg_tps_optimizer --dsn 'postgresql://postgres@db1.example.com:5432/postgres?sslmode=verify-full'
+</code></pre></div>
+<p><code>key=value</code> pairs:</p>
+<ul>
+<li>Are separated by whitespace; whitespace around <code>=</code> is allowed.</li>
+<li>Values with spaces must be quoted with single quotes: <code>application_name='pg tps'</code>. Within a
+  value, a backslash escapes the next character: <code>'it\'s'</code>.</li>
+<li>An empty value must be quoted as well (<code>password=''</code>): <code>password= user=x</code> sets the password to
+  <code>user=x</code>, like in libpq.</li>
+</ul>
+<p>URIs (<code>postgresql://</code> or <code>postgres://</code>):</p>
+<ul>
+<li><code>postgresql://[user[:password]@][host[:port][,host[:port]...]][/dbname][?key=value[&amp;...]]</code></li>
+<li>Every part is optional, and <code>?key=value</code> accepts any connection setting, like
+  <code>?sslmode=verify-full&amp;sslrootcert=/etc/pg/root.crt</code>.</li>
+<li>IPv6 addresses go in brackets (<code>[::1]:5432</code>), and special characters must be percent-encoded,
+  e.g. <code>%40</code> for <code>@</code> in a password, or <code>%2Fvar%2Frun%2Fpostgresql</code> for a unix socket directory as
+  host.</li>
+</ul>
+<p>In both formats, <code>~</code> is not expanded (only in environment variables): use absolute paths for
+certificate files.</p>
+<h3 id="service-files">Service files<a class="headerlink" href="#service-files" title="Permanent link">&para;</a></h3>
+<p>A service file holds named sets of connection settings, so you only need to give the service
+name, with <code>service=bench</code> in the connection string or <code>PGSERVICE=bench</code>:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a># ~/.pg_service.conf
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>[bench]
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>host=db1.example.com
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>port=5432
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>user=postgres
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>dbname=postgres
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>sslmode=verify-full
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>sslrootcert=/etc/pg_tps_optimizer/root.crt
+</code></pre></div>
+<p>The service is looked up like libpq does, in the first of these files that defines it:</p>
+<ol>
+<li>The user service file: <code>PGSERVICEFILE</code>, or <code>~/.pg_service.conf</code></li>
+<li>The system service file: <code>pg_service.conf</code> in <code>PGSYSCONFDIR</code>. Without <code>PGSYSCONFDIR</code>,
+   <code>/etc/postgresql-common/pg_service.conf</code> (Debian/Ubuntu) and
+   <code>/etc/sysconfig/pgsql/pg_service.conf</code> (RHEL) are used. (libpq uses the one directory it was
+   built with.)</li>
+</ol>
+<p>Every line in a service is <code>key=value</code>; values are not quoted, and lines starting with <code>#</code> are
+comments. Settings in the connection string override the service, and the service overrides
+environment variables. When the service isn't defined in any of the files, pg_tps_optimizer stops
+with <code>definition of service "bench" not found</code>.</p>
+<h3 id="password-file">Password file<a class="headerlink" href="#password-file" title="Permanent link">&para;</a></h3>
+<p>When no password is set (with <code>password=</code>, in a service file or with <code>PGPASSWORD</code>), the password
+is looked up in the password file, like libpq does: <code>passfile</code> in the connection string,
+<code>PGPASSFILE</code>, or <code>~/.pgpass</code>.</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a># ~/.pgpass: hostname:port:database:username:password
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>db1.example.com:5432:postgres:postgres:secret
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>*:*:*:benchmark:other\:secret
+</code></pre></div>
+<ul>
+<li>The first line that matches the connection wins; <code>*</code> matches anything.</li>
+<li>A <code>\</code> escapes the next character, so <code>\:</code> is a <code>:</code> and <code>\\</code> is a <code>\</code>.</li>
+<li>A unix socket connection matches the host name <code>localhost</code>.</li>
+<li>With several hosts, the first host and port are used.</li>
+<li>The file must only be readable by you (<code>chmod 600 ~/.pgpass</code>). A file that others can read is
+  ignored, with the warning <code>password file "..." has group or world access</code>.</li>
+</ul>
+<h3 id="not-supported">Not supported<a class="headerlink" href="#not-supported" title="Permanent link">&para;</a></h3>
+<ul>
+<li>Certificate revocation lists (<code>sslcrl</code>, <code>PGSSLCRL</code>). An <code>sslcrl</code> in the connection string is
+  ignored. Please open an issue if you need it.</li>
+</ul>
+<h2 id="tls-and-sslmode">TLS and sslmode<a class="headerlink" href="#tls-and-sslmode" title="Permanent link">&para;</a></h2>
+<p><code>sslmode</code> decides whether TLS is used, and how much of the server certificate is checked:</p>
+<table>
+<thead>
+<tr>
+<th>sslmode</th>
+<th>Uses TLS</th>
+<th>Checks the server certificate</th>
+<th>Server without TLS</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>disable</code></td>
+<td>never</td>
+<td>–</td>
+<td>connects</td>
+</tr>
+<tr>
+<td><code>allow</code></td>
+<td>only when connecting without TLS fails</td>
+<td>no</td>
+<td>connects</td>
+</tr>
+<tr>
+<td><code>prefer</code> (default)</td>
+<td>when the server supports it</td>
+<td>no</td>
+<td>connects</td>
+</tr>
+<tr>
+<td><code>require</code></td>
+<td>always</td>
+<td>no</td>
+<td>fails</td>
+</tr>
+<tr>
+<td><code>verify-ca</code></td>
+<td>always</td>
+<td>signed by the root certificate</td>
+<td>fails</td>
+</tr>
+<tr>
+<td><code>verify-full</code></td>
+<td>always</td>
+<td>signed by the root certificate, and valid for the host name</td>
+<td>fails</td>
+</tr>
+</tbody>
+</table>
+<p>Some things to keep in mind:</p>
+<ul>
+<li><strong>Use <code>verify-full</code> to protect against a man-in-the-middle.</strong> <code>prefer</code> and <code>require</code> encrypt the
+  connection, but don't check who you are talking to. <code>verify-ca</code> checks that the server
+  certificate is signed by your root certificate, but not for which server: any server with a
+  certificate from that CA is accepted. That is only safe when the CA signs nothing but your
+  PostgreSQL servers. <code>verify-full</code> also checks the host name.</li>
+<li><strong>Only <code>sslrootcert</code> is trusted.</strong> <code>verify-ca</code> and <code>verify-full</code> don't trust the CAs of the
+  operating system, only the root certificate(s) in <code>sslrootcert</code> (or <code>~/.postgresql/root.crt</code>),
+  unless <code>sslrootcert</code> is <code>system</code> (see below).</li>
+<li><strong><code>sslrootcert=system</code></strong> trusts the CAs of the operating system instead of a root certificate
+  file, like in libpq 16 and newer. Use it for a server with a certificate from a public CA.<ul>
+<li>Any public CA can issue a certificate, so it requires <code>verify-full</code>: that's the default with
+  <code>sslrootcert=system</code>, and a weaker <code>sslmode</code> gives an error.</li>
+<li>When <code>SSL_CERT_FILE</code> (a file) or <code>SSL_CERT_DIR</code> (directories, separated by <code>:</code>) is set,
+  only those CAs are trusted, and they must exist. Otherwise the CAs come from the usual
+  locations, like <code>/etc/ssl/certs</code>, <code>/etc/pki/tls</code> or <code>/etc/ssl/cert.pem</code> (macOS).</li>
+<li>The container image has the CA certificates of Debian (<code>ca-certificates</code>).</li>
+</ul>
+</li>
+<li><strong><code>require</code> never checks the server certificate</strong>, not even when a root certificate is configured.
+  This differs from libpq, where <code>require</code> behaves like <code>verify-ca</code> when a root certificate file
+  exists.</li>
+<li><strong><code>verify-ca</code> and <code>verify-full</code> need a root certificate.</strong> Without one (no <code>sslrootcert</code>, and no
+  <code>~/.postgresql/root.crt</code>) pg_tps_optimizer stops with an error, before connecting.</li>
+<li><strong><code>verify-full</code> checks the host name you connect to</strong> (<code>host</code>) against the server certificate.
+  Connecting to <code>127.0.0.1</code> with a certificate that is only valid for <code>localhost</code> fails.</li>
+<li><strong><code>allow</code></strong> first connects without TLS. Only when that fails (for instance because <code>pg_hba.conf</code>
+  only accepts TLS connections) does it try again with TLS. When both fail, the error of the TLS
+  attempt is reported, unless the server refused the connection without TLS (like a wrong
+  password) and the TLS attempt failed before reaching it: then that refusal is reported.</li>
+<li><strong>Unix sockets never use TLS.</strong> Like libpq, <code>sslmode</code> is ignored when <code>host</code> is a directory
+  (starts with <code>/</code>). A host list that mixes unix sockets and TCP hosts (like
+  <code>host=/var/run/postgresql,db1.example.com</code>) can't be used with <code>require</code>, <code>verify-ca</code> or
+  <code>verify-full</code>: pg_tps_optimizer stops with an error, instead of connecting to the TCP hosts
+  without TLS.</li>
+</ul>
+<h3 id="client-certificates">Client certificates<a class="headerlink" href="#client-certificates" title="Permanent link">&para;</a></h3>
+<p>A client certificate is used when <code>sslcert</code> is set (or <code>~/.postgresql/postgresql.crt</code> exists), with
+the private key from <code>sslkey</code> (or <code>~/.postgresql/postgresql.key</code>). This is needed when the server
+uses <code>cert</code> authentication in <code>pg_hba.conf</code>. The user name must match the common name (CN) of the
+certificate.</p>
+<p>Certificates and keys must be PEM files. When a certificate, key or root certificate is set but
+can't be loaded (missing file, wrong format), pg_tps_optimizer stops with an error, instead of
+connecting without it. A certificate and key only work as a pair: setting only one of them (or
+having only one of the two default files) is an error as well. libpq silently ignores a key
+without a certificate.</p>
+<h3 id="example-client-certificate-and-verify-full">Example: client certificate and verify-full<a class="headerlink" href="#example-client-certificate-and-verify-full" title="Permanent link">&para;</a></h3>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>export PGHOST=db1.example.com
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>export PGUSER=postgres
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>export PGDATABASE=postgres
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>export PGSSLMODE=verify-full
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>export PGSSLROOTCERT=/etc/pg_tps_optimizer/root.crt
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>export PGSSLCERT=/etc/pg_tps_optimizer/postgres.crt
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>export PGSSLKEY=/etc/pg_tps_optimizer/postgres.key
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>pg_tps_optimizer
+</code></pre></div>
+<p>With the container image, pass the same environment variables (one <code>-e</code> per variable) and mount
+the certificates:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>docker run --rm \
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>  -e PGHOST=db1.example.com -e PGUSER=postgres -e PGDATABASE=postgres \
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>  -e PGSSLMODE=verify-full \
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>  -e PGSSLROOTCERT=/certs/root.crt -e PGSSLCERT=/certs/postgres.crt -e PGSSLKEY=/certs/postgres.key \
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>  -v /etc/pg_tps_optimizer:/certs:ro \
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>  mannemsolutions/pg_tps_optimizer
+</code></pre></div>
+<h2 id="connection-behaviour">Connection behaviour<a class="headerlink" href="#connection-behaviour" title="Permanent link">&para;</a></h2>
+<p>This table shows the result of every <code>sslmode</code> for different server setups. <em>Connects</em> means the
+benchmark runs; <em>fails</em> means pg_tps_optimizer stops with an error (see
+<a href="#when-connecting-fails">When connecting fails</a>).</p>
+<table>
+<thead>
+<tr>
+<th>Server</th>
+<th>Root certificate</th>
+<th>Host</th>
+<th>disable</th>
+<th>allow</th>
+<th>prefer</th>
+<th>require</th>
+<th>verify-ca</th>
+<th>verify-full</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>without TLS</td>
+<td>correct</td>
+<td>localhost</td>
+<td>✅ connects</td>
+<td>✅ connects</td>
+<td>✅ connects</td>
+<td>❌ fails</td>
+<td>❌ fails</td>
+<td>❌ fails</td>
+</tr>
+<tr>
+<td>TLS only</td>
+<td>correct</td>
+<td>localhost</td>
+<td>❌ fails</td>
+<td>✅ connects</td>
+<td>✅ connects</td>
+<td>✅ connects</td>
+<td>✅ connects</td>
+<td>✅ connects</td>
+</tr>
+<tr>
+<td>TLS only</td>
+<td>wrong CA</td>
+<td>localhost</td>
+<td></td>
+<td></td>
+<td>✅ connects</td>
+<td>✅ connects ¹</td>
+<td>❌ fails</td>
+<td>❌ fails</td>
+</tr>
+<tr>
+<td>TLS only</td>
+<td>none</td>
+<td>localhost</td>
+<td></td>
+<td></td>
+<td></td>
+<td>✅ connects</td>
+<td>❌ fails</td>
+<td>❌ fails</td>
+</tr>
+<tr>
+<td>TLS only</td>
+<td>correct</td>
+<td>127.0.0.1 ²</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>✅ connects</td>
+<td>❌ fails</td>
+</tr>
+<tr>
+<td>TLS only</td>
+<td>wrong CA, but trusted by the OS ³</td>
+<td>localhost</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+<td>❌ fails</td>
+<td>❌ fails</td>
+</tr>
+<tr>
+<td>without TLS</td>
+<td>correct</td>
+<td><code>/nonexistent,localhost</code> ⁴</td>
+<td></td>
+<td></td>
+<td>✅ connects</td>
+<td>❌ fails</td>
+<td></td>
+<td></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Server without TLS:</strong> <code>ssl = off</code> in <code>postgresql.conf</code>.</li>
+<li><strong>TLS only:</strong> <code>ssl = on</code>, and <code>pg_hba.conf</code> only has <code>hostssl</code> entries (no <code>host</code> or <code>hostnossl</code>),
+  so connections without TLS are rejected.</li>
+<li><strong>Root certificate:</strong> <em>correct</em> is the CA that signed the server certificate, <em>wrong CA</em> is a CA
+  that didn't, and <em>none</em> means no <code>sslrootcert</code> and no <code>~/.postgresql/root.crt</code>.</li>
+<li>Empty cells are not tested; they behave like the <em>correct</em> root certificate row.</li>
+</ul>
+<p>¹ <code>require</code> never checks the server certificate. libpq checks the CA for <code>require</code> when a root
+certificate is configured; pg_tps_optimizer deliberately doesn't.
+² The server certificate is only valid for <code>localhost</code>, so only <code>verify-full</code> notices the mismatch.
+³ <code>sslrootcert</code> doesn't contain the CA that signed the server certificate, but the trust store of
+the operating system does. Only <code>sslrootcert</code> is trusted.
+⁴ A host list with a unix socket and a TCP host. <code>require</code>, <code>verify-ca</code> and <code>verify-full</code> are refused
+for such a list, instead of connecting to the TCP host without TLS.</p>
+<p>Every filled cell is covered by an end-to-end test in <a href="https://github.com/pgvillage-tools/pg_tps_optimizer/blob/main/tests/e2e/sslmode.rs"><code>tests/e2e/sslmode.rs</code></a>, which runs
+pg_tps_optimizer against PostgreSQL in a container.</p>
+<h2 id="when-connecting-fails">When connecting fails<a class="headerlink" href="#when-connecting-fails" title="Permanent link">&para;</a></h2>
+<p>When pg_tps_optimizer can't connect, it prints a single line starting with <code>error:</code> to stderr and
+exits with exit code 2, 3 or 4 (see below). The line includes the reason PostgreSQL or the TLS library gave, for
+example:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>error: connection to server at "localhost", port 5432 failed: error performing TLS handshake: server does not support TLS
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>error: root certificate file "~/.postgresql/root.crt" does not exist; either provide the file or change sslmode to disable server certificate verification
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>error: connection to server at "localhost", port 5432 failed: error connecting to server: Connection refused (os error 61)
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>error: connection to server at "localhost", port 5432 failed: db error: FATAL: database "nope" does not exist
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Message contains</th>
+<th>Likely cause</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>server does not support TLS</code></td>
+<td><code>sslmode</code> is <code>require</code> or <code>verify-*</code>, but <code>ssl = off</code> on the server</td>
+</tr>
+<tr>
+<td><code>no pg_hba.conf entry ... no encryption</code></td>
+<td>the server only accepts TLS, but <code>sslmode</code> is <code>disable</code></td>
+</tr>
+<tr>
+<td><code>connection requires a valid client certificate</code></td>
+<td><code>pg_hba.conf</code> uses <code>cert</code>, but no client certificate is configured</td>
+</tr>
+<tr>
+<td><code>certificate verify failed</code></td>
+<td><code>sslmode=verify-*</code> and the server certificate isn't signed by the root certificate, or (<code>verify-full</code>) isn't valid for the host name</td>
+</tr>
+<tr>
+<td><code>root certificate file ... does not exist</code></td>
+<td><code>sslmode=verify-*</code> without a root certificate</td>
+</tr>
+<tr>
+<td><code>weak sslmode ... may not be used with sslrootcert=system</code></td>
+<td><code>sslrootcert=system</code> with an <code>sslmode</code> other than <code>verify-full</code></td>
+</tr>
+<tr>
+<td><code>SSL_CERT_FILE ... does not exist</code> (or <code>SSL_CERT_DIR</code>)</td>
+<td><code>sslrootcert=system</code> with an <code>SSL_CERT_FILE</code> or <code>SSL_CERT_DIR</code> that doesn't exist</td>
+</tr>
+<tr>
+<td><code>sslrootcert=system: no certificates of the OS found</code></td>
+<td>no CA certificates in the usual locations: set <code>SSL_CERT_FILE</code> or <code>SSL_CERT_DIR</code></td>
+</tr>
+<tr>
+<td><code>sslkey is set, but sslcert is not</code> (or the other way around)</td>
+<td>only one of the client certificate and key is configured, or only one of the default files in <code>~/.postgresql</code> exists</td>
+</tr>
+<tr>
+<td><code>mixes unix sockets and TCP hosts</code></td>
+<td><code>host</code> lists unix sockets and TCP hosts, with <code>sslmode</code> <code>require</code> or <code>verify-*</code></td>
+</tr>
+<tr>
+<td><code>definition of service ... not found</code></td>
+<td><code>service</code> or <code>PGSERVICE</code> names a service that is not in any <a href="#service-files">service file</a></td>
+</tr>
+<tr>
+<td><code>invalid connection string</code></td>
+<td>the connection string can't be parsed (for instance an unterminated quote, or a key without <code>=</code>), or has an unknown key (for instance <code>client_encoding</code>)</td>
+</tr>
+<tr>
+<td><code>password authentication failed</code></td>
+<td>wrong or missing password: check <code>PGPASSWORD</code>, <code>password=</code> or the <a href="#password-file">password file</a> (and its permissions)</td>
+</tr>
+<tr>
+<td><code>Connection refused</code></td>
+<td>wrong host or port, or PostgreSQL isn't running</td>
+</tr>
+</tbody>
+</table>
+<p>The exit code tells the kind of error: 2 for invalid connection settings, 3 when the server can't be
+reached or TLS fails, and 4 when the server refuses the connection; see
+<a href="../usage/#exit-codes">Exit codes</a>.</p>
+<p>When a connection of one of the benchmark clients fails during a run, the client logs the error and
+tries to reconnect, without stopping the run.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright &copy; Nibble-IT
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.copy", "navigation.indexes", "navigation.path", "navigation.sections", "navigation.top", "navigation.tracking", "search.suggest", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "provider": "mike"}}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
