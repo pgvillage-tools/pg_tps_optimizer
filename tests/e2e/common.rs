@@ -15,6 +15,9 @@ pub use testcontainers_modules::testcontainers::{Container, CopyTargetOptions, I
 
 pub const CERT_DIR: &str = "/certs";
 pub const BINARY_TIMEOUT: Duration = Duration::from_secs(60);
+// The tests run benchmarks at full load in parallel, on the same container runtime, so a new
+// container (initdb and the first start) can take longer than the default of 60 seconds
+pub const STARTUP_TIMEOUT: Duration = Duration::from_secs(180);
 
 // Only local connections and client certificate authentication over TLS are allowed
 pub const PG_HBA_CLIENT_CERT: &str = "local all all trust
@@ -97,6 +100,7 @@ pub fn start_postgres() -> Container<Postgres> {
     Postgres::default()
         .with_host_auth()
         .with_tag(pg_version())
+        .with_startup_timeout(STARTUP_TIMEOUT)
         .start()
         .expect("could not start postgres container")
 }
@@ -114,6 +118,7 @@ pub fn start_postgres_with_tls(certs: &Certs, pg_hba: &str) -> Container<Postgre
     );
     Postgres::default()
         .with_tag(pg_version())
+        .with_startup_timeout(STARTUP_TIMEOUT)
         .with_copy_to(
             CopyTargetOptions::new(format!("{}/ca.crt", CERT_DIR)),
             certs.ca.clone().into_bytes(),
