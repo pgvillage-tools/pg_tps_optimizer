@@ -62,12 +62,12 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             Some(result) => {
                 sampler.next()?;
                 let latency = result.latency.num_microseconds().unwrap() as f64;
-                let pg_tps: f64 = sampler.tps() as f64;
+                let pg_tps: f64 = sampler.tps();
                 if !result.stable {
                     instable = true;
                 }
                 println!(
-                    "| {0} | {1:7.5} | {2} {3:>11.3} | {4:>9.1} | {5:>11.3} | {6:>9.3} | {7:>9.3} |",
+                    "| {0} | {1:7.5} | {2} {3:>11.3} | {4:>9.1} | {5:>11.3} | {6:>9.3} | {7:>9.1} |",
                     chrono::offset::Local::now().format("%Y-%m-%d %H:%M:%S"),
                     num_threads,
                     match result.stable {
@@ -78,7 +78,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     latency,
                     result.tps / latency,
                     pg_tps,
-                    sampler.wal_per_sec() as i32,
+                    sampler.wal_per_sec(),
                     );
             }
             None => {
