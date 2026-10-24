@@ -5,23 +5,25 @@ authors = ["Sebastiaan Mannem <sebastiaan.mannem@enterprisedb.com>"]
 edition = "2018"
 
 [dependencies]
-postgres = { version = "0.19.5", features = ["with-chrono-0_4"] }
+# Keep sorted, so dependencies added in parallel PRs land on different lines
 chrono = "0.4.24"
-uzers = "0.12.2"
-openssl = { version = "0.10.72", features = ["vendored"] }
-postgres-openssl = "0.5.0"
-shellexpand = "3.1.2"
-regex = "1"
+clap = { version = "4.6.7", features = ["derive", "env"] }
+duration-string = "0.5.3"
+home = "0.5.5"
+libc = "0.2"
+more-asserts = "0.3.1"
 num = "0.4.0"
 num-traits = "0.2.15"
-duration-string = "0.5.3"
-more-asserts = "0.3.1"
-range_check = "0.2.0"
-home = "0.5.5"
-clap = { version = "4.6.7", features = ["derive", "env"] }
-libc = "0.2"
+openssl = { version = "0.10.72", features = ["vendored"] }
 openssl-probe = "0.2.1"
+postgres = { version = "0.19.5", features = ["with-chrono-0_4"] }
+postgres-openssl = "0.5.0"
+range_check = "0.2.0"
+regex = "1"
+shellexpand = "3.1.2"
+uzers = "0.12.2"
 
 [dev-dependencies]
+# Keep sorted, so dependencies added in parallel PRs land on different lines
 rcgen = "0.14.10"
 testcontainers-modules = { version = "0.15.0", features = ["postgres", "blocking"] }
