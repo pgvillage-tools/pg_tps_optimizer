@@ -370,7 +370,16 @@ impl Dsn {
             // First try without TLS, and only with TLS when that fails
             "allow" => match config.clone().ssl_mode(SslMode::Disable).connect(NoTls) {
                 Ok(client) => Ok(client),
-                Err(_) => config.ssl_mode(SslMode::Require).connect(tls()?),
+                Err(plain) => match config.ssl_mode(SslMode::Require).connect(tls()?) {
+                    // When the server refused the plain connection, and TLS fails without an
+                    // answer from the server, the refusal is the error that matters
+                    Err(tls_error)
+                        if tls_error.as_db_error().is_none() && plain.as_db_error().is_some() =>
+                    {
+                        Err(plain)
+                    }
+                    result => result,
+                },
             },
             "prefer" => config.ssl_mode(SslMode::Prefer).connect(tls()?),
             "require" | "verify-ca" | "verify-full" => {

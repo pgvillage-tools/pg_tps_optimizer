@@ -163,7 +163,8 @@ Some things to keep in mind:
   Connecting to `127.0.0.1` with a certificate that is only valid for `localhost` fails.
 - **`allow`** first connects without TLS. Only when that fails (for instance because `pg_hba.conf`
   only accepts TLS connections) does it try again with TLS. When both fail, the error of the TLS
-  attempt is reported.
+  attempt is reported, unless the server refused the connection without TLS (like a wrong
+  password) and the TLS attempt failed before reaching it: then that refusal is reported.
 - **Unix sockets never use TLS.** Like libpq, `sslmode` is ignored when `host` is a directory
   (starts with `/`). A host list that mixes unix sockets and TCP hosts (like
   `host=/var/run/postgresql,db1.example.com`) can't be used with `require`, `verify-ca` or

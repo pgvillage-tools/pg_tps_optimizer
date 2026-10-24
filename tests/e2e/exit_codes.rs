@@ -44,6 +44,21 @@ fn exits_with_distinct_codes_for_connection_errors() {
         exit_code(&home, &env(&[("PGDATABASE", "nope".to_string())])),
         Some(4)
     );
+    // With allow, the TLS retry fails (no TLS), but the refusal of the plain attempt is reported
+    let run = run_pg_tps_optimizer(
+        &home,
+        &env(&[
+            ("PGPASSWORD", "wrong".to_string()),
+            ("PGSSLMODE", "allow".to_string()),
+        ]),
+    );
+    run.assert_clean_failure();
+    assert_eq!(run.output.status.code(), Some(4), "{}", run.describe());
+    assert!(
+        String::from_utf8_lossy(&run.output.stderr).contains("password authentication failed"),
+        "{}",
+        run.describe()
+    );
     // 0: the run finishes
     let run = run_pg_tps_optimizer(&home, &env(&[]));
     run.assert_success();
