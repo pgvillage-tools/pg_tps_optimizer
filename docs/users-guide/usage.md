@@ -9,8 +9,9 @@ Without options, pg_tps_optimizer connects with the default
 
 ## Options
 
-Every option can also be set with an environment variable. An option on the command line wins over
-the environment variable, which wins over the default.
+Every option can also be set with an environment variable, or in a [config file](#config-file). An
+option on the command line wins over the environment variable, which wins over the config file,
+which wins over the default.
 
 | Option | Environment variable | Default | Description |
 |---|---|---|---|
@@ -23,6 +24,7 @@ the environment variable, which wins over the default.
 | `-p`, `--prepared` | `PGTPSPREPARED` | off | Run the query as a prepared statement |
 | `-q`, `--query` | `PGTPSQUERY` | | Not used yet, see below |
 | `-o`, `--output` | `PGTPSOUTPUT` | `table` | `table`: a table while running; `json`: a JSON document at the end, see [JSON output](results.md#json-output) |
+| `-c`, `--config` | `PGTPSCONFIG` | | A YAML [config file](#config-file) with the options |
 | `-h`, `--help` | | | Show the options |
 | `-V`, `--version` | | | Show the version |
 
@@ -33,6 +35,33 @@ For the on/off options, the environment variable can be `true`/`false`, `1`/`0`,
     `--query` is accepted, but not used yet: the clients always run the built-in workload (see
     below). Making the query configurable is
     [issue #34](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/34).
+
+## Config file
+
+Instead of options, you can put the settings in a YAML file, and pass it with `--config` (or
+`PGTPSCONFIG`):
+
+```yaml
+# pg_tps_optimizer.yaml
+dsn: host=db1.example.com user=postgres dbname=postgres sslmode=verify-full
+range: "1:200"
+min-samples: 20
+spread: 5
+max-wait: 30s
+prepared: true
+```
+
+```
+pg_tps_optimizer --config pg_tps_optimizer.yaml
+```
+
+- Every option can be set, with its long name as key: `min-samples` (or `min_samples`), `max-wait`,
+  and so on. Options that take more values take a list: `graph-input: [a.json, b.json]`.
+- The values in the config file replace the defaults: `--help` shows them as defaults, and an option
+  on the command line or an environment variable still wins. So you can keep the common settings in
+  the file, and change one with an option: `pg_tps_optimizer -c pg_tps_optimizer.yaml --range 8:200`.
+- Quote values that YAML could read differently, like `range: "1:200"`.
+- An unknown key, invalid YAML or an invalid value stops pg_tps_optimizer with an error (exit code 2).
 
 ## How it works
 
