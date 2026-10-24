@@ -61,8 +61,9 @@ update pg_tps_optimizer set id = $1 where id = $1
 So the user needs permission to create a table (or the table must exist), and to insert and update
 it. The table is left behind after the run.
 
-With `--transactional`, every update runs in its own transaction. With `--prepared`, the update runs
-as a prepared statement.
+With `--transactional`, every update runs in its own transaction (`begin`, update, `commit`). With
+`--prepared`, every client prepares the update once (again after a reconnect), and then only
+executes it, which saves parsing and planning it for every transaction. Both can be combined.
 
 ## Examples
 
