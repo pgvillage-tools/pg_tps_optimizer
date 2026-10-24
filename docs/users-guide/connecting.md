@@ -23,7 +23,8 @@ Connection settings come from four places. Later sources override earlier ones, 
 | `port` | `PGPORT` | `5432` |
 | `user` | `PGUSER` | the current OS user |
 | `dbname` | `PGDATABASE` | the user name |
-| `password` | `PGPASSWORD` | empty |
+| `password` | `PGPASSWORD` | from the [password file](#password-file), if a line matches |
+| `passfile` | `PGPASSFILE` | `~/.pgpass` |
 | `sslmode` | `PGSSLMODE` | `prefer` |
 | `sslcert` | `PGSSLCERT` | `~/.postgresql/postgresql.crt`, if it exists |
 | `sslkey` | `PGSSLKEY` | `~/.postgresql/postgresql.key`, if it exists |
@@ -98,9 +99,27 @@ comments. Settings in the connection string override the service, and the servic
 environment variables. When the service isn't defined in any of the files, pg_tps_optimizer stops
 with `definition of service "bench" not found`.
 
+### Password file
+
+When no password is set (with `password=`, in a service file or with `PGPASSWORD`), the password
+is looked up in the password file, like libpq does: `passfile` in the connection string,
+`PGPASSFILE`, or `~/.pgpass`.
+
+```
+# ~/.pgpass: hostname:port:database:username:password
+db1.example.com:5432:postgres:postgres:secret
+*:*:*:benchmark:other\:secret
+```
+
+- The first line that matches the connection wins; `*` matches anything.
+- A `\` escapes the next character, so `\:` is a `:` and `\\` is a `\`.
+- A unix socket connection matches the host name `localhost`.
+- With several hosts, the first host and port are used.
+- The file must only be readable by you (`chmod 600 ~/.pgpass`). A file that others can read is
+  ignored, with the warning `password file "..." has group or world access`.
+
 ### Not supported
 
-- A password file (`~/.pgpass`, `PGPASSFILE`). Use `PGPASSWORD` or `password=` instead.
 - Certificate revocation lists (`sslcrl`, `PGSSLCRL`). An `sslcrl` in the connection string is
   ignored. Please open an issue if you need it.
 
@@ -250,6 +269,7 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |
 | `definition of service ... not found` | `service` or `PGSERVICE` names a service that is not in any [service file](#service-files) |
 | `invalid connection string` | the connection string can't be parsed (for instance an unterminated quote, or a key without `=`), or has an unknown key (for instance `client_encoding`) |
+| `password authentication failed` | wrong or missing password: check `PGPASSWORD`, `password=` or the [password file](#password-file) (and its permissions) |
 | `Connection refused` | wrong host or port, or PostgreSQL isn't running |
 
 All errors currently use exit code 1. Separate exit codes per kind of error are planned in
