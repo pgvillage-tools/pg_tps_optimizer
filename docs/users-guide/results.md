@@ -98,6 +98,33 @@ pg_tps_optimizer --output json > results.json
 
 When a step got no samples at all (shown as `?` in the table), its measurements are `null`.
 
+## Graph
+
+With `--graph <file>` (or `PGTPSGRAPH`), pg_tps_optimizer also draws a graph of the TPS per number
+of clients, with the numbers of clients evenly spaced on the x axis (1, 2, 3, 5, 8, ...):
+
+```
+pg_tps_optimizer --graph tps.png
+pg_tps_optimizer --graph tps.svg
+```
+
+The graph is a PNG, or an SVG when the file name ends with `.svg`; `--graph-format png|svg` sets
+the format explicitly. An SVG scales without getting blurry, and is easy to put on a web page.
+
+### Comparing runs
+
+To compare runs, save each run with `--output json`, and draw them together with `--graph-input`.
+pg_tps_optimizer then doesn't run (or connect), but draws one line per JSON report, named after the
+file:
+
+```
+pg_tps_optimizer --output json > 4cpu.json    # on one setup
+pg_tps_optimizer --output json > 8cpu.json    # on another one
+pg_tps_optimizer --graph compare.svg --graph-input 4cpu.json --graph-input 8cpu.json
+```
+
+Steps without measurements (`?` in the table) are left out of the lines.
+
 ## Interpreting the results
 
 In the example above (PostgreSQL 18 in a small virtual machine):
