@@ -35,8 +35,9 @@ docker run --rm -e PGHOST=db1.example.com -e PGUSER=postgres -e PGPASSWORD=secre
   mannemsolutions/pg_tps_optimizer --range 200
 ```
 
-**Note:** pg_tps_optimizer creates a small table (`pg_tps_optimizer`) in the database it connects
-to, and generates as much load as the server can handle.
+**Note:** by default, pg_tps_optimizer creates a small table (`pg_tps_optimizer`) in the database it
+connects to (dropped after the run), and generates as much load as the server can handle. With
+`--query`, it runs your own query instead.
 
 ## Documentation
 
