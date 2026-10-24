@@ -20,13 +20,9 @@ pub struct Params {
     #[arg(short, long, env = "PGTPSSOURCE", default_value = "")]
     pub dsn: String,
 
-    /// the query to run
-    #[arg(
-        short,
-        long,
-        env = "PGTPSQUERY",
-        default_value = "select * from pg_tables"
-    )]
+    /// the query every client runs; $1 is the number of the client. Without a query, every
+    /// client updates its own row in table pg_tps_optimizer (removed after the run)
+    #[arg(short, long, env = "PGTPSQUERY", default_value = "")]
     pub query: String,
 
     /// you can run prepared statements, or run direct statements

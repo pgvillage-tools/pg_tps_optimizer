@@ -75,8 +75,10 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     report.info("Initializing");
     let w: Workload = args.as_workload();
     report.info(&w.as_string());
-    let mut threader = threader::Threader::new(max_threads as usize, w);
+    let default_workload = w.is_default();
     let mut sampler = pg_sampler::PgSampler::new(args.as_dsn())?;
+    sampler.check_query(&w)?;
+    let mut threader = threader::Threader::new(max_threads as usize, w);
     sampler.next()?;
     report.start();
 
@@ -128,6 +130,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     report.info("Stopping, but lets give the threads some time to stop");
     threader.finish();
+    if default_workload {
+        if let Err(err) = sampler.drop_table() {
+            eprintln!("warning: could not drop table pg_tps_optimizer: {}", err);
+        }
+    }
 
     report.info("Finished");
     ::std::process::exit(0);

@@ -4,6 +4,7 @@ The main idea is to get the number of transactions and de amount of WAL.
 We also capture the duration between 2 samples, and as such also know TPS and WAL per sec.
 */
 use crate::dsn::Dsn;
+use crate::threader::workload::{client_params, Workload, TABLE_NAME};
 use chrono::Utc;
 use postgres::{Client, Error, Statement};
 
@@ -32,6 +33,30 @@ impl PgSampler {
             previous: TransactDataSample::new(),
             latest: TransactDataSample::new(),
         })
+    }
+    // Check a custom query before the clients start: it must be valid, and use at most $1
+    pub fn check_query(&mut self, workload: &Workload) -> Result<(), Box<dyn std::error::Error>> {
+        if workload.is_default() {
+            return Ok(());
+        }
+        let statement = self.client.prepare(&workload.query()).map_err(|e| {
+            format!(
+                "invalid query: {}",
+                e.as_db_error()
+                    .map(|e| e.message())
+                    .unwrap_or(&e.to_string())
+            )
+        })?;
+        client_params(statement.params(), 0).map_err(|e| format!("invalid query: {}", e))?;
+        Ok(())
+    }
+    // Remove the table of the default workload after the run. Clients that are still finishing
+    // may hold locks on it, so don't wait for them for more than a few seconds.
+    pub fn drop_table(&mut self) -> Result<(), Error> {
+        self.client.batch_execute(&format!(
+            "SET lock_timeout = '5s'; DROP TABLE IF EXISTS {}",
+            TABLE_NAME
+        ))
     }
     pub fn next(&mut self) -> Result<(), Error> {
         // The WAL written since the latest sample, which becomes the previous one

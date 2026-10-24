@@ -67,3 +67,94 @@ fn prepares_statements_once_per_client_in_transactions() {
         "true",
     );
 }
+
+fn table_exists(pg: &Container<Postgres>, table: &str) -> bool {
+    let mut admin = postgres::Client::connect(
+        &format!(
+            "host=localhost port={} user=postgres dbname=postgres",
+            pg.get_host_port_ipv4(5432).unwrap()
+        ),
+        postgres::NoTls,
+    )
+    .unwrap();
+    let row = admin
+        .query_one(
+            "select count(*) from pg_tables where tablename = $1",
+            &[&table],
+        )
+        .unwrap();
+    row.get::<_, i64>(0) > 0
+}
+
+fn query_env(
+    pg: &Container<Postgres>,
+    extra: &[(&'static str, String)],
+) -> Vec<(&'static str, String)> {
+    let mut env = vec![
+        ("PGHOST", "localhost".to_string()),
+        ("PGPORT", pg.get_host_port_ipv4(5432).unwrap().to_string()),
+        ("PGUSER", "postgres".to_string()),
+        ("PGDATABASE", "postgres".to_string()),
+        ("PGSSLMODE", "disable".to_string()),
+    ];
+    env.extend_from_slice(extra);
+    env
+}
+
+// The default workload creates table pg_tps_optimizer, and removes it after the run
+#[test]
+#[ignore = "requires a container runtime"]
+fn removes_the_table_of_the_default_workload() {
+    let pg = start_postgres();
+    let home = scratch_dir("removes_the_table_of_the_default_workload").join("home");
+    fs::create_dir_all(&home).unwrap();
+    run_pg_tps_optimizer(&home, &query_env(&pg, &[])).assert_success();
+    assert!(!table_exists(&pg, "pg_tps_optimizer"));
+}
+
+// --query runs a custom query, with the number of the client as $1, as the type the query needs;
+// it doesn't create table pg_tps_optimizer
+#[test]
+#[ignore = "requires a container runtime"]
+fn runs_a_custom_query() {
+    let pg = start_postgres();
+    let home = scratch_dir("runs_a_custom_query").join("home");
+    fs::create_dir_all(&home).unwrap();
+    for (query, prepared) in [
+        ("select 1", "false"),
+        ("select $1::int", "false"),
+        ("select 'client ' || $1::text", "true"),
+        ("select $1::bigint * 2", "true"),
+    ] {
+        let run = run_pg_tps_optimizer(
+            &home,
+            &query_env(
+                &pg,
+                &[
+                    ("PGTPSQUERY", query.to_string()),
+                    ("PGTPSPREPARED", prepared.to_string()),
+                ],
+            ),
+        );
+        run.assert_success();
+    }
+    assert!(!table_exists(&pg, "pg_tps_optimizer"));
+
+    // An invalid query, or one with more than $1, stops before the clients start
+    for (query, error) in [
+        ("selec 1", "syntax error"),
+        ("select $1::bool", "the query uses it as bool"),
+        ("select $1::int + $2::int", "only $1"),
+    ] {
+        let run =
+            run_pg_tps_optimizer(&home, &query_env(&pg, &[("PGTPSQUERY", query.to_string())]));
+        run.assert_clean_failure();
+        let stderr = String::from_utf8_lossy(&run.output.stderr).to_string();
+        assert!(
+            stderr.contains("invalid query") && stderr.contains(error),
+            "{}: {}",
+            query,
+            run.describe()
+        );
+    }
+}

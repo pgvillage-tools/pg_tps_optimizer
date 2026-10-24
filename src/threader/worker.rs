@@ -1,12 +1,11 @@
 use crate::threader::sample::{ParallelSamples, Sample};
 use chrono::Utc;
+use postgres::types::ToSql;
 use postgres::{Client, Statement};
 use std::sync::mpsc;
 use std::thread;
 
-use super::workload::{Workload, WorkloadType};
-
-const TABLE_NAME: &str = "pg_tps_optimizer";
+use super::workload::{client_params, Workload, WorkloadType, TABLE_NAME};
 
 pub struct Worker {
     id: u32,
@@ -32,6 +31,10 @@ impl Worker {
     }
     pub fn initialize(&self) -> Result<Client, Box<dyn std::error::Error>> {
         let mut client = self.workload.client()?;
+        // The default workload updates a row per client; a custom query needs no setup
+        if !self.workload.is_default() {
+            return Ok(client);
+        }
         client.query(
             format!("create table if not exists {} (id oid)", TABLE_NAME).as_str(),
             &[],
@@ -51,7 +54,7 @@ impl Worker {
 
         //Sleep 100 milliseconds
         let mut client = self.initialize()?;
-        let mut statement = prepare(&mut client, &self.workload.w_type())?;
+        let mut session = Session::new(&mut client, &self.workload, self.id)?;
 
         loop {
             if let Ok(done) = self.done.read() {
@@ -62,10 +65,9 @@ impl Worker {
             }
             match sample(
                 &mut client,
-                statement.as_ref(),
+                &session,
                 self.workload.w_type(),
                 (tps / 10_f64) as u64,
-                self.id,
             ) {
                 Ok(sample) => {
                     //tps = samples.tot_tps_singlethread() as u64;
@@ -81,10 +83,10 @@ impl Worker {
                     // A prepared statement belongs to its connection, so prepare it again
                     match self.workload.client() {
                         Ok(mut new_client) => {
-                            match prepare(&mut new_client, &self.workload.w_type()) {
-                                Ok(new_statement) => {
+                            match Session::new(&mut new_client, &self.workload, self.id) {
+                                Ok(new_session) => {
                                     client = new_client;
-                                    statement = new_statement;
+                                    session = new_session;
                                 }
                                 Err(err) => eprintln!("error: worker {}: {}", self.id, err),
                             }
@@ -98,54 +100,69 @@ impl Worker {
     }
 }
 
-fn update_query() -> String {
-    format!("update {} set id=$1 where id=$1", TABLE_NAME)
+// What a client needs to run the query on its connection: the query, the statement (for
+// --prepared, prepared once per connection), and the parameters
+struct Session {
+    query: String,
+    statement: Option<Statement>,
+    params: Vec<Box<dyn ToSql + Sync>>,
 }
 
-// Prepared workloads prepare the statement once per connection, and run it for every query
-fn prepare(
-    client: &mut Client,
-    w_type: &WorkloadType,
-) -> Result<Option<Statement>, postgres::Error> {
-    match w_type {
-        WorkloadType::Prepared | WorkloadType::PreparedTransactional => {
-            Ok(Some(client.prepare(&update_query())?))
-        }
-        WorkloadType::Default | WorkloadType::Transactional => Ok(None),
+impl Session {
+    fn new(
+        client: &mut Client,
+        workload: &Workload,
+        id: u32,
+    ) -> Result<Session, Box<dyn std::error::Error>> {
+        let query = workload.query();
+        // Preparing tells which type PostgreSQL expects for $1
+        let statement = client.prepare(&query)?;
+        let params = client_params(statement.params(), id)?;
+        let statement = match workload.w_type() {
+            WorkloadType::Prepared | WorkloadType::PreparedTransactional => Some(statement),
+            WorkloadType::Default | WorkloadType::Transactional => None,
+        };
+        Ok(Session {
+            query,
+            statement,
+            params,
+        })
+    }
+    fn params(&self) -> Vec<&(dyn ToSql + Sync)> {
+        self.params.iter().map(|param| param.as_ref()).collect()
     }
 }
 
 fn sample(
     client: &mut Client,
-    statement: Option<&Statement>,
+    session: &Session,
     w_type: WorkloadType,
     mut num_queries: u64,
-    thread_id: u32,
 ) -> Result<Sample, postgres::Error> {
     if num_queries < 1 {
         num_queries = 1;
     }
     let mut s = Sample::new();
-    let query = update_query();
+    let params = session.params();
 
     for _x in 0..num_queries {
         let start = Utc::now();
-        match (&w_type, statement) {
+        match (&w_type, &session.statement) {
             (WorkloadType::Prepared, Some(statement)) => {
-                client.query(statement, &[&thread_id])?;
+                client.query(statement, &params)?;
             }
             (WorkloadType::PreparedTransactional, Some(statement)) => {
                 let mut trans = client.transaction()?;
-                trans.query(statement, &[&thread_id])?;
+                trans.query(statement, &params)?;
                 trans.commit()?;
             }
             (WorkloadType::Transactional, _) => {
                 let mut trans = client.transaction()?;
-                trans.query(query.as_str(), &[&thread_id])?;
+                trans.query(session.query.as_str(), &params)?;
                 trans.commit()?;
             }
             _ => {
-                client.query(query.as_str(), &[&thread_id])?;
+                client.query(session.query.as_str(), &params)?;
             }
         }
         s.increment(Utc::now() - start);
