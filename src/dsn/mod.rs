@@ -10,8 +10,9 @@ use postgres::{Client, Config, NoTls};
 use postgres_openssl::MakeTlsConnector;
 use std::collections::HashMap;
 use std::error::Error;
+use std::ffi::OsString;
 use std::fmt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use uzers::{get_current_uid, get_user_by_uid};
 
 #[derive(Debug, Clone)]
@@ -64,6 +65,53 @@ const ENV_SETTINGS: [(&str, &str); 8] = [
     ("PGLOADBALANCEHOSTS", "load_balance_hosts"),
     ("PGSSLNEGOTIATION", "sslnegotiation"),
 ];
+
+#[derive(Debug, PartialEq)]
+struct CaLocations {
+    files: Vec<PathBuf>,
+    dirs: Vec<PathBuf>,
+}
+
+// The CA certificates for sslrootcert=system. When SSL_CERT_FILE or SSL_CERT_DIR is set, only those
+// (SSL_CERT_DIR can be a list of directories, separated by :), and they must exist. Otherwise the
+// usual locations of the OS, as the OpenSSL built into the binary doesn't know them.
+fn system_ca_locations(
+    cert_file: Option<OsString>,
+    cert_dir: Option<OsString>,
+) -> Result<CaLocations, String> {
+    let cert_file = cert_file.filter(|value| !value.is_empty());
+    let cert_dir = cert_dir.filter(|value| !value.is_empty());
+    if cert_file.is_none() && cert_dir.is_none() {
+        let probe = openssl_probe::probe();
+        if probe.cert_file.is_none() && probe.cert_dir.is_empty() {
+            return Err(
+                "sslrootcert=system: no certificates of the OS found; set SSL_CERT_FILE or \
+                 SSL_CERT_DIR"
+                    .to_string(),
+            );
+        }
+        return Ok(CaLocations {
+            files: probe.cert_file.into_iter().collect(),
+            dirs: probe.cert_dir,
+        });
+    }
+    let files: Vec<PathBuf> = cert_file.iter().map(PathBuf::from).collect();
+    if let Some(file) = files.iter().find(|file| !file.is_file()) {
+        return Err(format!(
+            "SSL_CERT_FILE \"{}\" does not exist",
+            file.display()
+        ));
+    }
+    let dirs: Vec<PathBuf> = cert_dir
+        .iter()
+        .flat_map(std::env::split_paths)
+        .filter(|dir| !dir.as_os_str().is_empty())
+        .collect();
+    if let Some(dir) = dirs.iter().find(|dir| !dir.is_dir()) {
+        return Err(format!("SSL_CERT_DIR \"{}\" does not exist", dir.display()));
+    }
+    Ok(CaLocations { files, dirs })
+}
 
 fn os_user_name() -> String {
     let mut user = generic::get_env_str("", "PGUSER", "").to_string();
@@ -378,28 +426,22 @@ impl Dsn {
 
         self.finish_tls_connector(builder)
     }
-    // sslrootcert=system: trust the CAs of the OS. The OpenSSL built into the binary doesn't
-    // know where the OS keeps them, so look for them (like native-tls does); SSL_CERT_FILE and
-    // SSL_CERT_DIR still win.
+    // sslrootcert=system: trust the CAs of the OS (see system_ca_locations)
     fn system_tls_connector(
         &self,
         mut builder: openssl::ssl::SslConnectorBuilder,
     ) -> Result<MakeTlsConnector, Box<dyn Error>> {
         builder.set_cert_store(X509StoreBuilder::new()?.build());
-        let probe = openssl_probe::probe();
-        if probe.cert_file.is_none() && probe.cert_dir.is_empty() {
-            return Err(
-                "sslrootcert=system: no certificates of the OS found; set SSL_CERT_FILE \
-                        or SSL_CERT_DIR"
-                    .into(),
-            );
-        }
-        if let Some(file) = &probe.cert_file {
+        let locations = system_ca_locations(
+            std::env::var_os("SSL_CERT_FILE"),
+            std::env::var_os("SSL_CERT_DIR"),
+        )?;
+        for file in &locations.files {
             builder
                 .load_verify_locations(Some(file), None)
                 .map_err(|e| format!("could not load \"{}\": {}", file.display(), e))?;
         }
-        for dir in &probe.cert_dir {
+        for dir in &locations.dirs {
             builder
                 .load_verify_locations(None, Some(dir))
                 .map_err(|e| format!("could not load \"{}\": {}", dir.display(), e))?;
@@ -526,6 +568,52 @@ mod tests {
         fs::write(first.join(".s.PGSQL.5433"), "").unwrap();
         assert_eq!(default_socket_dir(&dirs, "5433"), dirs[0]);
         assert_eq!(default_socket_dir(&dirs, "5432"), dirs[1]);
+
+        fs::remove_dir_all(&base).unwrap();
+    }
+
+    #[test]
+    fn test_system_ca_locations() {
+        let base = std::env::temp_dir().join(format!("pg_tps_ca_{}", std::process::id()));
+        let (dir1, dir2) = (base.join("dir1"), base.join("dir2"));
+        fs::create_dir_all(&dir1).unwrap();
+        fs::create_dir_all(&dir2).unwrap();
+        let file = base.join("ca.crt");
+        fs::write(&file, "").unwrap();
+        let os = |p: &Path| Some(p.as_os_str().to_os_string());
+
+        // Only the configured file, no OS directories
+        assert_eq!(
+            system_ca_locations(os(&file), None).unwrap(),
+            CaLocations {
+                files: vec![file.clone()],
+                dirs: vec![]
+            }
+        );
+        // A list of directories
+        let list = std::env::join_paths([&dir1, &dir2]).unwrap();
+        assert_eq!(
+            system_ca_locations(None, Some(list)).unwrap(),
+            CaLocations {
+                files: vec![],
+                dirs: vec![dir1.clone(), dir2.clone()]
+            }
+        );
+        // Configured paths must exist
+        let err = system_ca_locations(os(&base.join("missing.crt")), None).unwrap_err();
+        assert!(err.starts_with("SSL_CERT_FILE"), "{}", err);
+        let list = std::env::join_paths([&dir1, &base.join("missing")]).unwrap();
+        let err = system_ca_locations(None, Some(list)).unwrap_err();
+        assert!(
+            err.starts_with("SSL_CERT_DIR") && err.contains("missing"),
+            "{}",
+            err
+        );
+        // Empty values count as not set
+        assert_eq!(
+            system_ca_locations(Some(OsString::new()), Some(OsString::new())).is_ok(),
+            system_ca_locations(None, None).is_ok()
+        );
 
         fs::remove_dir_all(&base).unwrap();
     }
