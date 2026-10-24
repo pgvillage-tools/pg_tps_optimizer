@@ -123,7 +123,7 @@ fn table_row(step: &Step) -> String {
         step.wal_kb_per_sec,
     ) {
         (Some(tps), Some(latency), Some(tps_per_latency), Some(pg_tps), Some(wal)) => format!(
-            "| {0} | {1:7.5} | {2} {3:>11.3} | {4:>9.1} | {5:>11.3} | {6:>9.3} | {7:>9.3} |",
+            "| {0} | {1:7.5} | {2} {3:>11.3} | {4:>9.1} | {5:>11.3} | {6:>9.3} | {7:>9.1} |",
             timestamp,
             step.clients,
             match step.stable {
@@ -134,7 +134,7 @@ fn table_row(step: &Step) -> String {
             latency,
             tps_per_latency,
             pg_tps,
-            wal as i32,
+            wal,
         ),
         _ => format!(
             "| {0} | {1:7.5} |   {2:>11.3} | {3:>9.1} | {4:>11.3} | {5:>9.3} | {6:>9.3} |",
@@ -164,7 +164,7 @@ mod tests {
     fn test_table_row() {
         assert_eq!(
             table_row(&step(Some(10000.0))),
-            "| 2026-10-24 10:00:00 |       5 | *   10000.000 |     500.0 |      20.000 |  9900.000 |       614 |"
+            "| 2026-10-24 10:00:00 |       5 | *   10000.000 |     500.0 |      20.000 |  9900.000 |     614.7 |"
         );
         assert_eq!(
             table_row(&step(None)),

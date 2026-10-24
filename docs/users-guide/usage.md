@@ -22,6 +22,7 @@ the environment variable, which wins over the default.
 | `-t`, `--transactional` | `PGTPSTRANSACTIONAL` | off | Run every query in its own transaction (`begin` / `commit`) |
 | `-p`, `--prepared` | `PGTPSPREPARED` | off | Run the query as a prepared statement |
 | `-q`, `--query` | `PGTPSQUERY` | | Not used yet, see below |
+| `-o`, `--output` | `PGTPSOUTPUT` | `table` | `table`: a table while running; `json`: a JSON document at the end, see [JSON output](results.md#json-output) |
 | `-h`, `--help` | | | Show the options |
 | `-V`, `--version` | | | Show the version |
 
