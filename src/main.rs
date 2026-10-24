@@ -52,7 +52,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .iter()
             .map(|path| load_series(path))
             .collect::<Result<Vec<_>, _>>()?;
-        output::graph::draw(graph, &series)?;
+        output::graph::draw(graph, args.graph_format, &series)?;
         eprintln!("Wrote graph to {}", graph.display());
         return Ok(());
     }
@@ -122,7 +122,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             name: "TPS".to_string(),
             steps: report.steps().to_vec(),
         };
-        output::graph::draw(graph, &[series])?;
+        output::graph::draw(graph, args.graph_format, &[series])?;
         report.info(&format!("Wrote graph to {}", graph.display()));
     }
 

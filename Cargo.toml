@@ -17,7 +17,7 @@ num = "0.4.0"
 num-traits = "0.2.15"
 openssl = { version = "0.10.72", features = ["vendored"] }
 openssl-probe = "0.2.1"
-plotters = { version = "0.3.7", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "point_series", "ab_glyph"] }
+plotters = { version = "0.3.7", default-features = false, features = ["bitmap_backend", "bitmap_encoder", "line_series", "point_series", "ab_glyph", "svg_backend"] }
 postgres = { version = "0.19.5", features = ["with-chrono-0_4"] }
 postgres-openssl = "0.5.0"
 range_check = "0.2.0"

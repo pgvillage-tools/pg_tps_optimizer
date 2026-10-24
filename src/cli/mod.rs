@@ -1,4 +1,5 @@
 use crate::dsn::Dsn;
+use crate::output::graph::GraphFormat;
 use crate::output::Format;
 use crate::threader::workload::Workload;
 use clap::{CommandFactory, FromArgMatches, Parser};
@@ -56,9 +57,13 @@ pub struct Params {
     #[arg(short, long, env = "PGTPSOUTPUT", value_enum, default_value_t = Format::Table)]
     pub output: Format,
 
-    /// write a PNG graph of the TPS per number of clients to this file
+    /// write a graph of the TPS per number of clients to this file (PNG, or SVG for .svg)
     #[arg(short, long, env = "PGTPSGRAPH")]
     pub graph: Option<PathBuf>,
+
+    /// the format of the graph; auto: SVG when the file name ends with .svg, otherwise PNG
+    #[arg(long, env = "PGTPSGRAPHFORMAT", value_enum, default_value_t = GraphFormat::Auto)]
+    pub graph_format: GraphFormat,
 
     /// instead of running, draw the graph of these JSON reports (from --output json), one line per
     /// report; repeat (or separate with commas) for more reports
@@ -185,6 +190,7 @@ mod tests {
 
             config: None,
             graph: None,
+            graph_format: GraphFormat::Auto,
             graph_input: Vec::new(),
         }
     }

@@ -71,6 +71,19 @@ fn draws_graph_from_json_reports() {
     let png = std::fs::read(&graph).unwrap();
     assert_eq!(&png[1..4], b"PNG");
 
+    // SVG for a .svg file name
+    let svg_graph = dir.join("graph.svg");
+    let output = Command::new(env!("CARGO_BIN_EXE_pg_tps_optimizer"))
+        .arg("--graph")
+        .arg(&svg_graph)
+        .arg("--graph-input")
+        .arg(dir.join("run1.json"))
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let svg = std::fs::read_to_string(&svg_graph).unwrap();
+    assert!(svg.starts_with("<svg") && svg.contains("run1"), "{}", svg);
+
     // A file that is not a JSON report gives a clean error
     std::fs::write(dir.join("bad.json"), "not json").unwrap();
     let output = Command::new(env!("CARGO_BIN_EXE_pg_tps_optimizer"))
