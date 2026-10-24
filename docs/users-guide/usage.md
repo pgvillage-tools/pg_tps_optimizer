@@ -24,6 +24,9 @@ which wins over the default.
 | `-p`, `--prepared` | `PGTPSPREPARED` | off | Run the query as a prepared statement |
 | `-q`, `--query` | `PGTPSQUERY` | | Not used yet, see below |
 | `-o`, `--output` | `PGTPSOUTPUT` | `table` | `table`: a table while running; `json`: a JSON document at the end, see [JSON output](results.md#json-output) |
+| `-g`, `--graph` | `PGTPSGRAPH` | | Write a graph of the TPS per number of clients to this file, see [Graph](results.md#graph) |
+| `--graph-format` | `PGTPSGRAPHFORMAT` | `auto` | `png`, `svg`, or `auto`: SVG when the file name ends with `.svg`, otherwise PNG |
+| `--graph-input` | `PGTPSGRAPHINPUT` | | Don't run, but draw the graph of these JSON reports (from `--output json`); repeat it, or separate the files with commas |
 | `-c`, `--config` | `PGTPSCONFIG` | | A YAML [config file](#config-file) with the options |
 | `-h`, `--help` | | | Show the options |
 | `-V`, `--version` | | | Show the version |
