@@ -50,6 +50,8 @@ version-resolver:
       - 'style'
       - 'test'
   default: patch
+# Only the PR title sets the label: feature PRs update the docs (and sometimes CI) as well, and
+# release-drafter lists a PR under every category that matches one of its labels
 autolabeler:
   - label: 'breaking'
     title:
@@ -62,17 +64,9 @@ autolabeler:
   - label: 'ci'
     title:
       - '/^(ci|build)(\([a-z]*\))?!?:/i'
-    files:
-      - '.github/*'
-      - '.github/**/*'
   - label: 'documentation'
     title:
       - '/^docs(\([a-z]*\))?!?:/i'
-    files:
-      - 'docs/*'
-      - 'docs/**/*'
-      - '*.md'
-      - '**/*.md'
   - label: 'enhancement'
     title:
       - '/^(feat|perf)(\([a-z]*\))?!?:/i'
