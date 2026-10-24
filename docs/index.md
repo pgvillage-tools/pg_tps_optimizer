@@ -34,9 +34,9 @@ docker run --rm -e PGHOST=db1.example.com -e PGUSER=postgres -e PGPASSWORD=secre
 ```
 
 !!! warning
-    pg_tps_optimizer creates a small table (`pg_tps_optimizer`) in the database it connects to,
-    and generates as much load as the server can handle. Don't point it at a production database
-    unless you know what you are doing.
+    By default, pg_tps_optimizer creates a small table (`pg_tps_optimizer`) in the database it
+    connects to, which it drops after the run, and it generates as much load as the server can
+    handle. Don't point it at a production database unless you know what you are doing.
 
 See [Installation](users-guide/installation.md) and [Usage](users-guide/usage.md) for more.
 

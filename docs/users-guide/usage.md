@@ -22,7 +22,7 @@ which wins over the default.
 | `-M`, `--max-wait` | `PGTPSMAXWAIT` | `10s` | How long to wait for a step to become stable, like `10s`, `1m30s` or `20` (seconds) |
 | `-t`, `--transactional` | `PGTPSTRANSACTIONAL` | off | Run every query in its own transaction (`begin` / `commit`) |
 | `-p`, `--prepared` | `PGTPSPREPARED` | off | Run the query as a prepared statement |
-| `-q`, `--query` | `PGTPSQUERY` | | Not used yet, see below |
+| `-q`, `--query` | `PGTPSQUERY` | | The query every client runs, with the number of the client as `$1`; see [The workload](#the-workload) |
 | `-o`, `--output` | `PGTPSOUTPUT` | `table` | `table`: a table while running; `json`: a JSON document at the end, see [JSON output](results.md#json-output) |
 | `-g`, `--graph` | `PGTPSGRAPH` | | Write a graph of the TPS per number of clients to this file, see [Graph](results.md#graph) |
 | `--graph-format` | `PGTPSGRAPHFORMAT` | `auto` | `png`, `svg`, or `auto`: SVG when the file name ends with `.svg`, otherwise PNG |
@@ -33,11 +33,6 @@ which wins over the default.
 
 For the on/off options, the environment variable can be `true`/`false`, `1`/`0`, `yes`/`no` or
 `on`/`off`.
-
-!!! note
-    `--query` is accepted, but not used yet: the clients always run the built-in workload (see
-    below). Making the query configurable is
-    [issue #34](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/34).
 
 ## Config file
 
@@ -83,19 +78,37 @@ Because of the Fibonacci steps, the maximum works in steps as well: with `--rang
 
 ### The workload
 
-pg_tps_optimizer creates a table `pg_tps_optimizer (id oid)` in the database it connects to, if it
-doesn't exist yet, and empties it. Every client inserts a row with its own id, and then runs this
-statement as fast as it can:
+Every client runs a query as fast as it can: the default workload, or your own query.
+
+**The default workload.** pg_tps_optimizer creates a table `pg_tps_optimizer (id oid)` in the
+database it connects to (if it doesn't exist yet), and empties it. Every client inserts a row with
+its own number, and then runs:
 
 ```sql
 update pg_tps_optimizer set id = $1 where id = $1
 ```
 
-So the user needs permission to create a table (or the table must exist), and to insert and update
-it. The table is left behind after the run.
+So the user needs permission to create the table (or the table must exist), and to insert and
+update it. After the run, the table is dropped. (If the run fails halfway, it's left behind.)
 
-With `--transactional`, every update runs in its own transaction (`begin`, update, `commit`). With
-`--prepared`, every client prepares the update once (again after a reconnect), and then only
+**Your own query.** With `--query` (or `PGTPSQUERY`, or `query:` in the config file), every client
+runs your query instead, and no table is created:
+
+```
+pg_tps_optimizer --query 'select * from accounts where id = $1::int'
+pg_tps_optimizer --query 'insert into events (client) values ($1)'
+```
+
+- `$1` is the number of the client (0, 1, 2, ...), passed as the type the query needs for it: a
+  number (`int`, `bigint`, `oid`, ...) or `text`. When PostgreSQL can't tell the type, cast it,
+  like `$1::int`. The query doesn't need to use `$1`.
+- Only `$1` is supported; a query with `$2` or more gives an error.
+- The query is checked before the clients start, so a typo stops pg_tps_optimizer with
+  `error: invalid query: ...`.
+- Rows a query returns are read, but not used.
+
+With `--transactional`, every query runs in its own transaction (`begin`, query, `commit`). With
+`--prepared`, every client prepares the query once (again after a reconnect), and then only
 executes it, which saves parsing and planning it for every transaction. Both can be combined.
 
 ## Examples
