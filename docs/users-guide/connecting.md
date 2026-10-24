@@ -245,7 +245,7 @@ pg_tps_optimizer against PostgreSQL in a container.
 ## When connecting fails
 
 When pg_tps_optimizer can't connect, it prints a single line starting with `error:` to stderr and
-exits with exit code 1. The line includes the reason PostgreSQL or the TLS library gave, for
+exits with exit code 2, 3 or 4 (see below). The line includes the reason PostgreSQL or the TLS library gave, for
 example:
 
 ```
@@ -272,8 +272,9 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `password authentication failed` | wrong or missing password: check `PGPASSWORD`, `password=` or the [password file](#password-file) (and its permissions) |
 | `Connection refused` | wrong host or port, or PostgreSQL isn't running |
 
-All errors currently use exit code 1. Separate exit codes per kind of error are planned in
-[#57](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/57).
+The exit code tells the kind of error: 2 for invalid connection settings, 3 when the server can't be
+reached or TLS fails, and 4 when the server refuses the connection; see
+[Exit codes](usage.md#exit-codes).
 
 When a connection of one of the benchmark clients fails during a run, the client logs the error and
 tries to reconnect, without stopping the run.

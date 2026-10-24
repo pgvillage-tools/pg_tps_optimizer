@@ -17,12 +17,14 @@
 //! - config: the config file
 //! - sslmode: sslmode, TLS and certificates
 //! - connection: connection strings, environment variables, service files
+//! - exit_codes: exit codes for connection errors
 //! - output: output formats (JSON, graph)
 //! - workload: transactional and prepared modes
 
 mod common;
 mod config;
 mod connection;
+mod exit_codes;
 mod output;
 mod sslmode;
 mod workload;

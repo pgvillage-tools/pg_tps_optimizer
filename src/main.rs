@@ -3,6 +3,7 @@ extern crate postgres;
 
 mod cli;
 mod dsn;
+mod exit;
 mod fibonacci;
 mod generic;
 mod output;
@@ -21,7 +22,7 @@ fn main() {
     }
     if let Err(err) = run() {
         eprintln!("error: {}", err);
-        ::std::process::exit(1);
+        ::std::process::exit(exit::code_of(err.as_ref()));
     }
 }
 
@@ -58,7 +59,9 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Validate before connecting
-    let max_wait: chrono::Duration = args.as_max_wait()?;
+    let max_wait: chrono::Duration = args
+        .as_max_wait()
+        .map_err(|e| exit::Failure::new(exit::USAGE, e))?;
     let (min_threads, max_threads) = args.range_min_max();
     let mut report = output::Report::new(
         args.output,

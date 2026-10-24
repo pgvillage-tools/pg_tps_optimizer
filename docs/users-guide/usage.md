@@ -138,11 +138,16 @@ pg_tps_optimizer --range 8:1000
 
 ## Exit codes
 
-| Exit code | Meaning |
-|---|---|
-| 0 | The run finished |
-| 1 | An error, like a connection error or an invalid `--max-wait`; the message is printed to stderr |
-| 2 | The options or `PGTPS*` environment variables can't be parsed, like `--spread abc` |
+Errors are printed to stderr as one line, starting with `error:`. The exit code tells what kind of
+error it was, so scripts can react to it:
 
-Separate exit codes per kind of error are planned in
-[issue #57](https://github.com/pgvillage-tools/pg_tps_optimizer/issues/57).
+| Exit code | Meaning | Examples |
+|---|---|---|
+| 0 | The run finished | |
+| 1 | An error during the run | a query fails after connecting |
+| 2 | Invalid options, environment variables, config file or connection settings: fix the command | `--spread abc`, an invalid `--max-wait`, an unknown key in the config file, an invalid connection string or `sslmode`, a missing certificate file, an unknown service |
+| 3 | The server can't be reached, or TLS fails | a wrong host or port, `Connection refused`, a time-out, `sslmode=require` against a server without TLS, a server certificate that doesn't verify |
+| 4 | The server refuses the connection | a wrong password, no matching line in `pg_hba.conf`, a database that doesn't exist, too many connections |
+
+When a benchmark client loses its connection during the run, it logs the error and reconnects, so
+that doesn't end the run.

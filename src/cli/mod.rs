@@ -101,7 +101,7 @@ fn config_path(args: impl Iterator<Item = String>) -> Option<PathBuf> {
 // Like clap, for errors before running
 fn exit_with_error(message: &str) -> ! {
     eprintln!("error: {}", message);
-    std::process::exit(2);
+    std::process::exit(crate::exit::USAGE);
 }
 
 impl Params {
