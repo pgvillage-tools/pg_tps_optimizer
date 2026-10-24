@@ -30,7 +30,7 @@ or with the container image:
 
 ```
 docker run --rm -e PGHOST=db1.example.com -e PGUSER=postgres -e PGPASSWORD=secret \
-  mannemsolutions/pg_tps_optimizer --range 200
+  ghcr.io/pgvillage-tools/pg_tps_optimizer --range 200
 ```
 
 !!! warning

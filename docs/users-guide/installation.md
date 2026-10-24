@@ -34,15 +34,21 @@ tar -xzf ${NAME}.tar.gz
 
 ## Container image
 
-The image `mannemsolutions/pg_tps_optimizer` on Docker Hub runs pg_tps_optimizer as its entrypoint,
-for `linux/amd64` and `linux/arm64`. Arguments after the image name are passed to
-pg_tps_optimizer, and settings can be passed as environment variables (one `-e` per variable):
+The image `ghcr.io/pgvillage-tools/pg_tps_optimizer` on the GitHub Container Registry runs
+pg_tps_optimizer as its entrypoint, for `linux/amd64` and `linux/arm64`. Every release is tagged
+with its version (like `v0.3.1`), and the newest release with `latest`. Arguments after the image
+name are passed to pg_tps_optimizer, and settings can be passed as environment variables (one `-e`
+per variable):
 
 ```
 docker run --rm \
   -e PGHOST=db1.example.com -e PGUSER=postgres -e PGPASSWORD=secret \
-  mannemsolutions/pg_tps_optimizer --range 200
+  ghcr.io/pgvillage-tools/pg_tps_optimizer --range 200
 ```
+
+!!! note
+    Releases up to v0.2.7 were published on Docker Hub, as `mannemsolutions/pg_tps_optimizer`
+    (only for `linux/amd64`). v0.3.0 has no container image.
 
 To use certificates, mount them into the container; see
 [Connecting to PostgreSQL](connecting.md#example-client-certificate-and-verify-full).
