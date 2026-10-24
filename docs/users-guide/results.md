@@ -145,6 +145,7 @@ So, depending on what you need:
 - more than 55 clients mostly adds latency. That's a good upper limit for a connection pool in
   front of this server.
 
-The numbers depend on the hardware, the PostgreSQL configuration and the workload. pg_tps_optimizer
-runs a very small update (see [the workload](usage.md#the-workload)), so it shows the limits of the
-server and the connection handling, not of your own queries.
+The numbers depend on the hardware, the PostgreSQL configuration and the workload. By default,
+pg_tps_optimizer runs a very small update (see [the workload](usage.md#the-workload)), so it shows
+the limits of the server and the connection handling, not of your own queries. To see those, run
+your own query with `--query`.

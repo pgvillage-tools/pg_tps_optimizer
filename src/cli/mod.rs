@@ -25,27 +25,27 @@ pub struct Params {
     #[arg(short, long, env = "PGTPSQUERY", default_value = "")]
     pub query: String,
 
-    /// you can run prepared statements, or run direct statements
+    /// prepare the query once per client, and then only execute it
     #[arg(short, long, env = "PGTPSPREPARED")]
     pub prepared: bool,
 
-    /// you can run inside of a transaction or direct
+    /// run every query in its own transaction (begin / commit)
     #[arg(short, long, env = "PGTPSTRANSACTIONAL")]
     pub transactional: bool,
 
-    /// you can set min and max of numclients if you know
+    /// the number of clients to run with: min:max, or only max
     #[arg(short, long, env = "PGTPSRANGE", default_value = "1:1000")]
     pub range: String,
 
-    /// you can set the spread that defines if the clients run stable.
+    /// the maximum spread (in %) of TPS and latency for a stable step
     #[arg(short, long, env = "PGTPSSPREAD", default_value_t = 10.0)]
     pub spread: f64,
 
-    /// number of samples before we check the spread.
+    /// the number of samples (of 200ms) to check if a step is stable
     #[arg(short = 'm', long, env = "PGTPSMINSAMPLES", default_value_t = 10)]
     pub min_samples: u32,
 
-    /// Give it this ammount of seconds before we decide it wil never stabilize.
+    /// how long to wait for a step to become stable, like 10s, 1m30s or 20 (seconds)
     #[arg(short = 'M', long, env = "PGTPSMAXWAIT", default_value = "10s")]
     pub max_wait: String,
 

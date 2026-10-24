@@ -45,7 +45,8 @@ The documentation is at **https://pgvillage-tools.github.io/pg_tps_optimizer/**
 (sources in [`docs/`](docs/)):
 
 - [Installation](docs/users-guide/installation.md)
-- [Usage](docs/users-guide/usage.md): options, environment variables and how it works
+- [Usage](docs/users-guide/usage.md): options, environment variables, the config file, how it
+  works, and exit codes
 - [Reading the results](docs/users-guide/results.md)
 - [Connecting to PostgreSQL](docs/users-guide/connecting.md): connection settings, TLS and service
   files
