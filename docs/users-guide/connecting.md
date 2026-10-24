@@ -131,7 +131,8 @@ Some things to keep in mind:
   file, like in libpq 16 and newer. Use it for a server with a certificate from a public CA.
     - Any public CA can issue a certificate, so it requires `verify-full`: that's the default with
       `sslrootcert=system`, and a weaker `sslmode` gives an error.
-    - The CAs are found in `SSL_CERT_FILE` / `SSL_CERT_DIR` when set, otherwise in the usual
+    - When `SSL_CERT_FILE` (a file) or `SSL_CERT_DIR` (directories, separated by `:`) is set,
+      only those CAs are trusted, and they must exist. Otherwise the CAs come from the usual
       locations, like `/etc/ssl/certs`, `/etc/pki/tls` or `/etc/ssl/cert.pem` (macOS).
     - The container image has no CA certificates: mount them and set `SSL_CERT_FILE`.
 - **`require` never checks the server certificate**, not even when a root certificate is configured.
@@ -243,6 +244,7 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `certificate verify failed` | `sslmode=verify-*` and the server certificate isn't signed by the root certificate, or (`verify-full`) isn't valid for the host name |
 | `root certificate file ... does not exist` | `sslmode=verify-*` without a root certificate |
 | `weak sslmode ... may not be used with sslrootcert=system` | `sslrootcert=system` with an `sslmode` other than `verify-full` |
+| `SSL_CERT_FILE ... does not exist` (or `SSL_CERT_DIR`) | `sslrootcert=system` with an `SSL_CERT_FILE` or `SSL_CERT_DIR` that doesn't exist |
 | `sslrootcert=system: no certificates of the OS found` | no CA certificates in the usual locations (for instance in the container): set `SSL_CERT_FILE` or `SSL_CERT_DIR` |
 | `sslkey is set, but sslcert is not` (or the other way around) | only one of the client certificate and key is configured, or only one of the default files in `~/.postgresql` exists |
 | `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |

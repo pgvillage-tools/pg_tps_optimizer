@@ -715,6 +715,21 @@ fn sslrootcert_system() {
     )
     .assert_clean_failure();
 
+    // A configured SSL_CERT_FILE that doesn't exist is an error (not a fallback to the OS CAs)
+    let run = run_pg_tps_optimizer(
+        &home,
+        &env(&[(
+            "SSL_CERT_FILE",
+            dir.join("missing.crt").display().to_string(),
+        )]),
+    );
+    run.assert_clean_failure();
+    assert!(
+        String::from_utf8_lossy(&run.output.stderr).contains("SSL_CERT_FILE"),
+        "{}",
+        run.describe()
+    );
+
     // A weaker sslmode is refused
     let run = run_pg_tps_optimizer(
         &home,
