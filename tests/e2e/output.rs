@@ -17,7 +17,7 @@ fn outputs_json() {
             ("PGDATABASE", "postgres".to_string()),
             ("PGSSLMODE", "disable".to_string()),
             ("PGTPSOUTPUT", "json".to_string()),
-            ("PGTPSRANGE", "1:4".to_string()),
+            ("PGTPSRANGE", "1:3".to_string()),
         ],
     );
     assert!(
@@ -27,9 +27,9 @@ fn outputs_json() {
     );
     let report: serde_json::Value = serde_json::from_slice(&run.output.stdout)
         .unwrap_or_else(|e| panic!("stdout is not JSON ({}): {}", e, run.describe()));
-    assert_eq!(report["settings"]["max_clients"], 4);
+    assert_eq!(report["settings"]["max_clients"], 3);
     let steps = report["steps"].as_array().unwrap();
-    // Fibonacci steps below 4 clients: 1, 2, 3
+    // Fibonacci steps up to 3 clients, the maximum included: 1, 2, 3
     let clients: Vec<u64> = steps
         .iter()
         .map(|s| s["clients"].as_u64().unwrap())

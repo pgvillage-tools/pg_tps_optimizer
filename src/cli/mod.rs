@@ -33,8 +33,9 @@ pub struct Params {
     #[arg(short, long, env = "PGTPSTRANSACTIONAL")]
     pub transactional: bool,
 
-    /// the number of clients to run with: min:max, or only max
-    #[arg(short, long, env = "PGTPSRANGE", default_value = "1:1000")]
+    /// the number of clients to run with: min:max, or only max (both included). The default
+    /// ends at 89 clients, below the default max_connections of 100
+    #[arg(short, long, env = "PGTPSRANGE", default_value = "1:100")]
     pub range: String,
 
     /// the maximum spread (in %) of TPS and latency for a stable step
@@ -161,7 +162,7 @@ impl Params {
             .filter_map(|digits| digits.as_str().parse().ok())
             .collect();
         match values.len() {
-            0 => (1, 1000),
+            0 => (1, 100),
             1 => (1, values[0]),
             _ => (values[0], values[values.len() - 1]),
         }

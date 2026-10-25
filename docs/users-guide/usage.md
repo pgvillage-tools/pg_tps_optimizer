@@ -5,7 +5,7 @@ pg_tps_optimizer [OPTIONS]
 ```
 
 Without options, pg_tps_optimizer connects with the default
-[connection settings](connecting.md) and runs with 1 up to 987 clients.
+[connection settings](connecting.md) and runs with 1 up to 89 clients.
 
 ## Options
 
@@ -16,7 +16,7 @@ which wins over the default.
 | Option | Environment variable | Default | Description |
 |---|---|---|---|
 | `-d`, `--dsn` | `PGTPSSOURCE` | | Connection string; see [Connecting to PostgreSQL](connecting.md) |
-| `-r`, `--range` | `PGTPSRANGE` | `1:1000` | The number of clients to run with: `min:max`, or only `max` |
+| `-r`, `--range` | `PGTPSRANGE` | `1:100` | The number of clients to run with: `min:max`, or only `max` (both included) |
 | `-m`, `--min-samples` | `PGTPSMINSAMPLES` | `10` | The number of samples (of 200ms) to check if a step is stable |
 | `-s`, `--spread` | `PGTPSSPREAD` | `10` | The maximum spread (in %) of TPS and latency for a stable step |
 | `-M`, `--max-wait` | `PGTPSMAXWAIT` | `10s` | How long to wait for a step to become stable, like `10s`, `1m30s` or `20` (seconds) |
@@ -71,10 +71,15 @@ pg_tps_optimizer --config pg_tps_optimizer.yaml
 4. When the step is stable, or after `--max-wait`, it prints the results of the step, and moves on
    to the next number of clients in the Fibonacci sequence: 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, ...
    A step that didn't become stable is marked with a `*`.
-5. It stops before the number of clients reaches the maximum of `--range`.
+5. It stops after the last step that isn't above the maximum of `--range`.
 
-Because of the Fibonacci steps, the maximum works in steps as well: with `--range 100` and
-`--range 99`, the last step is 89 clients, and with `--range 200` it is 144.
+Because of the Fibonacci steps, the maximum works in steps as well: with `--range 89` and
+`--range 100`, the last step is 89 clients, and with `--range 200` it is 144.
+
+The default, `1:100`, ends at 89 clients: with the connection pg_tps_optimizer uses for the
+statistics, that's 90 connections, which fits in the default `max_connections` of PostgreSQL
+(100, of which 3 are reserved for superusers). For more clients, raise `max_connections` on the
+server, and `--range`.
 
 ### The workload
 
@@ -133,7 +138,7 @@ docker run --rm \
 Start at 8 clients, for a server you know can handle that:
 
 ```
-pg_tps_optimizer --range 8:1000
+pg_tps_optimizer --range 8:100
 ```
 
 ## Exit codes
