@@ -111,6 +111,8 @@ pg_tps_optimizer --query 'insert into events (client) values ($1)'
 - The query is checked before the clients start, so a typo stops pg_tps_optimizer with
   `error: invalid query: ...` (exit code 2).
 - Rows a query returns are read, but not used.
+- The query is printed with the settings at the start (`query: ...`), and is part of the settings
+  in the JSON report, so you can tell runs apart later.
 
 With `--transactional`, every query runs in its own transaction (`begin`, query, `commit`). With
 `--prepared`, every client prepares the query once (again after a reconnect), and then only

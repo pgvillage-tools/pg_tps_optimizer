@@ -137,6 +137,12 @@ fn runs_a_custom_query() {
             ),
         );
         run.assert_success();
+        // The settings show the query
+        assert!(
+            String::from_utf8_lossy(&run.output.stdout).contains(&format!("query: {}\n", query)),
+            "{}",
+            run.describe()
+        );
     }
     assert!(!table_exists(&pg, "pg_tps_optimizer"));
 

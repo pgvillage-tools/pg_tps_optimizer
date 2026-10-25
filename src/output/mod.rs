@@ -14,11 +14,13 @@ pub enum Format {
 pub struct Settings {
     pub min_clients: u32,
     pub max_clients: u32,
-    pub max_wait_seconds: i64,
+    pub max_wait_seconds: f64,
     pub min_samples: u32,
     pub spread: f64,
     pub transactional: bool,
     pub prepared: bool,
+    // The query the clients run (also the one of the default workload)
+    pub query: String,
 }
 
 // The results of one step (number of clients). The measurements are missing (null in JSON) when

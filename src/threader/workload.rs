@@ -32,8 +32,9 @@ impl Workload {
     }
     pub fn as_string(&self) -> String {
         format!(
-            "dsn:{}\ntransactional: {}\nprepared: {}",
+            "dsn:{}\nquery: {}\ntransactional: {}\nprepared: {}",
             self.dsn.debug(),
+            self.query(),
             self.transactional,
             self.prepared
         )

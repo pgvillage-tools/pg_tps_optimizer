@@ -18,6 +18,7 @@ fn outputs_json() {
             ("PGSSLMODE", "disable".to_string()),
             ("PGTPSOUTPUT", "json".to_string()),
             ("PGTPSRANGE", "1:3".to_string()),
+            ("PGTPSMAXWAIT", "2500ms".to_string()),
         ],
     );
     assert!(
@@ -28,6 +29,11 @@ fn outputs_json() {
     let report: serde_json::Value = serde_json::from_slice(&run.output.stdout)
         .unwrap_or_else(|e| panic!("stdout is not JSON ({}): {}", e, run.describe()));
     assert_eq!(report["settings"]["max_clients"], 3);
+    assert_eq!(report["settings"]["max_wait_seconds"], 2.5);
+    assert_eq!(
+        report["settings"]["query"],
+        "update pg_tps_optimizer set id=$1 where id=$1"
+    );
     let steps = report["steps"].as_array().unwrap();
     // Fibonacci steps up to 3 clients, the maximum included: 1, 2, 3
     let clients: Vec<u64> = steps
@@ -39,8 +45,15 @@ fn outputs_json() {
         assert!(step["tps"].as_f64().unwrap() > 0.0, "{}", step);
         assert!(step["latency_us"].as_f64().unwrap() > 0.0, "{}", step);
     }
-    // The progress messages go to stderr
-    assert!(String::from_utf8_lossy(&run.output.stderr).contains("Finished"));
+    // The progress messages go to stderr, with the settings
+    let stderr = String::from_utf8_lossy(&run.output.stderr).to_string();
+    assert!(
+        stderr.contains("Finished")
+            && stderr.contains("query: update pg_tps_optimizer set id=$1 where id=$1")
+            && stderr.contains("max_wait: 2.5s"),
+        "{}",
+        run.describe()
+    );
 }
 
 // --graph writes a PNG with the TPS per number of clients of the run
