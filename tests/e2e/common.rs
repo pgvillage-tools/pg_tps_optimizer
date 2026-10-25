@@ -105,6 +105,18 @@ pub fn start_postgres() -> Container<Postgres> {
         .expect("could not start postgres container")
 }
 
+// A server that doesn't accept writes, like a standby: SHOW transaction_read_only gives on, which
+// is what libpq (and the postgres crate) check for target_session_attrs=read-write
+pub fn start_postgres_read_only() -> Container<Postgres> {
+    Postgres::default()
+        .with_host_auth()
+        .with_tag(pg_version())
+        .with_startup_timeout(STARTUP_TIMEOUT)
+        .with_cmd(["-c", "fsync=off", "-c", "default_transaction_read_only=on"])
+        .start()
+        .expect("could not start read-only postgres container")
+}
+
 pub fn start_postgres_with_tls(certs: &Certs, pg_hba: &str) -> Container<Postgres> {
     // PostgreSQL refuses a private key that is not owned by postgres with mode 0600 (or root
     // with 0640), and copied files are owned by root. So install the key with the right owner

@@ -69,6 +69,10 @@ impl Consumer {
         self.num_threads += extra_threads;
         leftover as u32
     }
+    // Whether all workers of this consumer have stopped
+    pub fn stopped(&self) -> bool {
+        self.threads.iter().all(|thread| thread.is_finished())
+    }
 }
 
 fn consumer(

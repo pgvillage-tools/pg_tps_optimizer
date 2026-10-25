@@ -79,10 +79,82 @@ fn reads_libpq_environment_variables() {
         run.describe()
     );
 
-    // The server is a primary, so a read-only session can't be found
+    // pg_tps_optimizer needs a server that accepts writes, so read-only is refused
     let mut env = base;
     env.push(("PGTARGETSESSIONATTRS", "read-only".to_string()));
-    run_pg_tps_optimizer(&home, &env).assert_clean_failure();
+    let run = run_pg_tps_optimizer(&home, &env);
+    run.assert_clean_failure();
+    assert_eq!(run.output.status.code(), Some(2), "{}", run.describe());
+    assert!(
+        String::from_utf8_lossy(&run.output.stderr)
+            .contains("target_session_attrs \"read-only\" is not supported"),
+        "{}",
+        run.describe()
+    );
+}
+
+// A run that worked: on a read-only server the clients log their failing queries (but the run
+// still finishes), so there must be no errors either
+fn assert_ran_without_errors(run: &Run) {
+    run.assert_success();
+    assert!(
+        !String::from_utf8_lossy(&run.output.stderr).contains("error"),
+        "expected no errors, {}",
+        run.describe()
+    );
+}
+
+// With several hosts, pg_tps_optimizer connects to the one that accepts writes (the primary),
+// like libpq with target_session_attrs=read-write. The read-only server comes first, so the run
+// only works when it is skipped (the default workload writes).
+#[test]
+#[ignore = "requires a container runtime"]
+fn finds_the_primary_among_several_hosts() {
+    let standby = start_postgres_read_only();
+    let primary = start_postgres();
+    let home = scratch_dir("finds_the_primary_among_several_hosts").join("home");
+    fs::create_dir_all(&home).unwrap();
+    let standby_port = standby.get_host_port_ipv4(5432).unwrap();
+    let primary_port = primary.get_host_port_ipv4(5432).unwrap();
+
+    // key=value: a list of hosts, and a list of ports (one per host)
+    let conninfo = format!(
+        "host=localhost,localhost port={},{} user=postgres dbname=postgres sslmode=disable",
+        standby_port, primary_port
+    );
+    assert_ran_without_errors(&run_pg_tps_optimizer(&home, &[("PGTPSSOURCE", conninfo)]));
+
+    // URI: host:port pairs
+    let uri = format!(
+        "postgresql://postgres@localhost:{},localhost:{}/postgres?sslmode=disable",
+        standby_port, primary_port
+    );
+    assert_ran_without_errors(&run_pg_tps_optimizer(&home, &[("PGTPSSOURCE", uri)]));
+
+    // Environment variables, with target_session_attrs=any: still read-write
+    let env = [
+        ("PGHOST", "localhost,localhost".to_string()),
+        ("PGPORT", format!("{},{}", standby_port, primary_port)),
+        ("PGUSER", "postgres".to_string()),
+        ("PGDATABASE", "postgres".to_string()),
+        ("PGSSLMODE", "disable".to_string()),
+        ("PGTARGETSESSIONATTRS", "any".to_string()),
+    ];
+    assert_ran_without_errors(&run_pg_tps_optimizer(&home, &env));
+
+    // Without a primary, it stops with exit code 3 (like a server that can't be reached)
+    let conninfo = format!(
+        "host=localhost port={} user=postgres dbname=postgres sslmode=disable",
+        standby_port
+    );
+    let run = run_pg_tps_optimizer(&home, &[("PGTPSSOURCE", conninfo)]);
+    run.assert_clean_failure();
+    assert_eq!(run.output.status.code(), Some(3), "{}", run.describe());
+    assert!(
+        String::from_utf8_lossy(&run.output.stderr).contains("no host accepts writes"),
+        "{}",
+        run.describe()
+    );
 }
 
 // Connection settings from a service file (pg_service.conf), named with PGSERVICE or service=

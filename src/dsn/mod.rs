@@ -200,6 +200,20 @@ impl Dsn {
             }
         }
 
+        // The workload writes (the default one creates a table), so only a server that accepts
+        // writes will do. With several hosts, that finds the primary, like libpq with
+        // target_session_attrs=read-write. `any` (the libpq default) is accepted, so service
+        // files that set it still work.
+        let target_session_attrs = dsn.get_value("target_session_attrs", "read-write");
+        if !["any", "read-write"].contains(&target_session_attrs.as_str()) {
+            dsn.invalid.push(format!(
+                "target_session_attrs \"{}\" is not supported: pg_tps_optimizer always connects \
+                 to a server that accepts writes (read-write)",
+                target_session_attrs
+            ));
+        }
+        dsn.set_value("target_session_attrs", "read-write");
+
         // Without a password, look in the password file, for the first host and port
         if dsn.get_value("password", "").is_empty() {
             let host = dsn.get_value("host", "");
@@ -393,12 +407,19 @@ impl Dsn {
                 Some(_) => exit::REJECTED,
                 None => exit::UNREACHABLE,
             };
-            let message = format!(
+            let mut message = format!(
                 "connection to server at \"{}\", port {} failed: {}",
                 self.get_value("host", ""),
                 self.get_value("port", ""),
                 error_chain(&e)
             );
+            // The postgres crate only reports the last host, so explain what was looked for
+            if message.contains("database does not allow writes") {
+                message.push_str(
+                    " (no host accepts writes: pg_tps_optimizer needs the primary, \
+                     target_session_attrs=read-write)",
+                );
+            }
             Box::new(Failure::new(code, message)) as Box<dyn Error>
         })
     }
@@ -670,6 +691,27 @@ mod tests {
             .unwrap()
             .to_string();
         assert!(err.contains("unknown option `unknown_key`"), "{}", err);
+    }
+
+    #[test]
+    fn test_target_session_attrs() {
+        for conninfo in [
+            "host=/tmp",
+            "host=/tmp target_session_attrs=any",
+            "host=/tmp target_session_attrs=read-write",
+        ] {
+            let dsn = Dsn::from_string(conninfo);
+            assert!(dsn.invalid.is_empty(), "{}: {:?}", conninfo, dsn.invalid);
+            assert_eq!(dsn.get_value("target_session_attrs", ""), "read-write");
+        }
+        for value in ["read-only", "standby", "prefer-standby", "primary", "bogus"] {
+            let err = Dsn::from_string(&format!("host=/tmp target_session_attrs={}", value))
+                .client()
+                .err()
+                .unwrap()
+                .to_string();
+            assert!(err.contains("is not supported"), "{}: {}", value, err);
+        }
     }
 
     #[test]
