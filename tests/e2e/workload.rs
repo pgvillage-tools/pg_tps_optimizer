@@ -160,3 +160,47 @@ fn runs_a_custom_query() {
         );
     }
 }
+
+// A query that fails on every run (but prepares fine) stops the run with exit code 1, after the
+// first step, and logs the error from PostgreSQL once per client. Client 0 divides by zero; client
+// 1 would succeed, but the second step doesn't run.
+#[test]
+#[ignore = "requires a container runtime"]
+fn stops_when_every_query_fails() {
+    let pg = start_postgres();
+    let home = scratch_dir("stops_when_every_query_fails").join("home");
+    fs::create_dir_all(&home).unwrap();
+    let run = run_pg_tps_optimizer(
+        &home,
+        &query_env(
+            &pg,
+            &[
+                ("PGTPSQUERY", "select 1/$1::int".to_string()),
+                ("PGTPSRANGE", "1:2".to_string()),
+            ],
+        ),
+    );
+    run.assert_clean_failure();
+    assert_eq!(run.output.status.code(), Some(1), "{}", run.describe());
+    let stderr = String::from_utf8_lossy(&run.output.stderr).to_string();
+    assert_eq!(
+        stderr
+            .matches("error: worker 0: db error: ERROR: division by zero")
+            .count(),
+        1,
+        "{}",
+        run.describe()
+    );
+    assert!(
+        stderr.contains("error: no transaction finished with 1 client within"),
+        "{}",
+        run.describe()
+    );
+    // Only the first step ran
+    let stdout = String::from_utf8_lossy(&run.output.stdout).to_string();
+    assert!(
+        !stdout.contains("|       2 |") && !stdout.contains("did not stabilize"),
+        "{}",
+        run.describe()
+    );
+}

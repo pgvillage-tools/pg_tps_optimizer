@@ -106,7 +106,12 @@ impl Report {
         match self.format {
             Format::Table => {
                 println!("|---------------------|---------|---------------|-----------|-------------|-----------|-----------|");
-                if self.steps.iter().any(|step| !step.stable) {
+                // A step without samples is shown with '?' instead
+                if self
+                    .steps
+                    .iter()
+                    .any(|step| !step.stable && step.tps.is_some())
+                {
                     println!("* Samples marked with '*' did not stabilize before max-wait.")
                 }
             }

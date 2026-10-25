@@ -85,6 +85,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     sampler.next()?;
     report.start();
 
+    // The number of clients of a step without any finished transactions, which ends the run
+    let mut failed_step: Option<u32> = None;
     for num_threads in Fibonacci::new(1_u32, 1_u32).take_while(|v| *v <= max_threads) {
         if num_threads < min_threads {
             continue;
@@ -117,6 +119,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
                     postgres_tps: None,
                     wal_kb_per_sec: None,
                 });
+                failed_step = Some(num_threads);
                 break;
             }
         }
@@ -137,6 +140,18 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         if let Err(err) = sampler.drop_table() {
             eprintln!("warning: could not drop table pg_tps_optimizer: {}", err);
         }
+    }
+
+    if let Some(clients) = failed_step {
+        return Err(Box::new(exit::Failure::new(
+            exit::ERROR,
+            format!(
+                "no transaction finished with {} {} within max-wait: the queries fail \
+                 (see the errors above) or hang",
+                clients,
+                if clients == 1 { "client" } else { "clients" }
+            ),
+        )));
     }
 
     report.info("Finished");
