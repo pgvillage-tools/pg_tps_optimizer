@@ -18,9 +18,9 @@ Connection settings come from four places. Later sources override earlier ones, 
 
 | Setting | Environment variable | Default |
 |---|---|---|
-| `host` | `PGHOST` | `hostaddr` when that is set; otherwise the unix socket directory with a running server for `port`: `/var/run/postgresql` or `/tmp` (`/tmp` when neither has one) |
+| `host` | `PGHOST` | `hostaddr` when that is set; otherwise the unix socket directory with a running server for `port`: `/var/run/postgresql` or `/tmp` (`/tmp` when neither has one). Can be a list, see [Several hosts](#several-hosts-finding-the-primary) |
 | `hostaddr` | `PGHOSTADDR` | not set |
-| `port` | `PGPORT` | `5432` |
+| `port` | `PGPORT` | `5432`; with several hosts, one port for all of them, or a list with a port per host |
 | `user` | `PGUSER` | the current OS user |
 | `dbname` | `PGDATABASE` | the user name |
 | `password` | `PGPASSWORD` | from the [password file](#password-file), if a line matches |
@@ -32,7 +32,7 @@ Connection settings come from four places. Later sources override earlier ones, 
 | `application_name` | `PGAPPNAME` | not set |
 | `options` | `PGOPTIONS` | not set |
 | `connect_timeout` | `PGCONNECT_TIMEOUT` | no timeout |
-| `target_session_attrs` | `PGTARGETSESSIONATTRS` | `any` (also `read-write`, `read-only`) |
+| `target_session_attrs` | `PGTARGETSESSIONATTRS` | always `read-write`, see [Several hosts](#several-hosts-finding-the-primary) |
 | `channel_binding` | `PGCHANNELBINDING` | `prefer` |
 | `load_balance_hosts` | `PGLOADBALANCEHOSTS` | `disable` |
 | `sslnegotiation` | `PGSSLNEGOTIATION` | `postgres` |
@@ -69,6 +69,36 @@ URIs (`postgresql://` or `postgres://`):
 
 In both formats, `~` is not expanded (only in environment variables): use absolute paths for
 certificate files.
+
+### Several hosts (finding the primary)
+
+Like libpq, you can give a list of hosts, for instance all servers of a cluster with streaming
+replication. pg_tps_optimizer tries them in order, and connects to the first one that accepts
+writes: the primary.
+
+```
+pg_tps_optimizer --dsn 'host=db1.example.com,db2.example.com,db3.example.com port=5432 user=postgres'
+pg_tps_optimizer --dsn 'host=db1.example.com,db2.example.com port=5432,5433 user=postgres'
+pg_tps_optimizer --dsn 'postgresql://postgres@db1.example.com:5432,db2.example.com:5433/postgres'
+PGHOST=db1.example.com,db2.example.com PGPORT=5432,5433 pg_tps_optimizer
+```
+
+- In `key=value` format and in environment variables, `host` is a comma-separated list of hosts,
+  and `port` is either one port for all hosts, or a list with a port per host (in the same order).
+  A port can't be part of the host (`host=db1:5432` doesn't work, in libpq neither); in a URI it
+  can, as `host:port`.
+- pg_tps_optimizer always connects with `target_session_attrs=read-write`: the workload writes
+  (the default workload creates a table), and the benchmark should run against the primary. Like
+  libpq, a server accepts writes when `SHOW transaction_read_only` gives `off`, so standbys (and
+  servers with `default_transaction_read_only = on`) are skipped.
+- `target_session_attrs=any` (the libpq default, which some service files set) is accepted, but
+  pg_tps_optimizer still looks for the primary. Any other value (`read-only`, `standby`,
+  `prefer-standby`, `primary`) stops it with an error (exit code 2).
+- When no host accepts writes, it stops with `no host accepts writes` (exit code 3). The error
+  shows the reason of the last host only.
+- All clients (and the statistics connection) connect the same way, so they all end up on the
+  primary, also with `load_balance_hosts=random`.
+- The [password file](#password-file) is only searched for the first host and port.
 
 ### Service files
 
@@ -267,6 +297,8 @@ error: connection to server at "localhost", port 5432 failed: db error: FATAL: d
 | `SSL_CERT_FILE ... does not exist` (or `SSL_CERT_DIR`) | `sslrootcert=system` with an `SSL_CERT_FILE` or `SSL_CERT_DIR` that doesn't exist |
 | `sslrootcert=system: no certificates of the OS found` | no CA certificates in the usual locations: set `SSL_CERT_FILE` or `SSL_CERT_DIR` |
 | `sslkey is set, but sslcert is not` (or the other way around) | only one of the client certificate and key is configured, or only one of the default files in `~/.postgresql` exists |
+| `no host accepts writes` | none of the hosts is a primary: they are standbys, or have `default_transaction_read_only = on` (see [Several hosts](#several-hosts-finding-the-primary)) |
+| `target_session_attrs ... is not supported` | `target_session_attrs` or `PGTARGETSESSIONATTRS` is set to something else than `read-write` or `any` |
 | `mixes unix sockets and TCP hosts` | `host` lists unix sockets and TCP hosts, with `sslmode` `require` or `verify-*` |
 | `definition of service ... not found` | `service` or `PGSERVICE` names a service that is not in any [service file](#service-files) |
 | `invalid connection string` | the connection string can't be parsed (for instance an unterminated quote, or a key without `=`), or has an unknown key (for instance `client_encoding`) |

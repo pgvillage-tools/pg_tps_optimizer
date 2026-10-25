@@ -4,7 +4,7 @@ A run prints its settings, and then one line per step (number of clients):
 
 ```
 Initializing
-dsn:dbname='postgres' host='db1.example.com' password='*****' port='5432' sslcert='' sslkey='' sslmode='prefer' sslrootcert='' user='postgres'
+dsn:dbname='postgres' host='db1.example.com' password='*****' port='5432' sslcert='' sslkey='' sslmode='prefer' sslrootcert='' target_session_attrs='read-write' user='postgres'
 transactional: false
 prepared: false
 min threads: 1 max threads: 200

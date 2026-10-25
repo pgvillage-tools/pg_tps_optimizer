@@ -66,9 +66,14 @@ impl Threader {
             *done = true;
         }
 
-        let wait = self.num_workers as u32 * std::time::Duration::from_millis(100) / 10;
-
-        thread::sleep(wait);
+        // Wait for the workers to finish their last sample, so the table of the default workload
+        // isn't dropped while they still use it. Not forever: a query could hang.
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        while !self.consumers.iter().all(|consumer| consumer.stopped())
+            && std::time::Instant::now() < deadline
+        {
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
     }
 
     pub fn wait_stable(

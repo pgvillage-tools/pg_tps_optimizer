@@ -45,7 +45,7 @@ The tests are split per subject, one module each, with shared helpers in `common
 | Module | Subject |
 |---|---|
 | `sslmode.rs` | sslmode, TLS and certificates |
-| `connection.rs` | connection strings, environment variables, service files and the password file |
+| `connection.rs` | connection strings, environment variables, service files, the password file and several hosts (finding the primary) |
 | `config.rs` | the config file (`--config`) |
 | `workload.rs` | the default workload, `--query`, and the transactional and prepared modes |
 | `output.rs` | JSON output and graphs |

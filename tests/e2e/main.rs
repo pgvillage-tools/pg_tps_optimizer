@@ -16,7 +16,7 @@
 //! - common: helpers (certificates, PostgreSQL containers, running the binary)
 //! - config: the config file
 //! - sslmode: sslmode, TLS and certificates
-//! - connection: connection strings, environment variables, service files
+//! - connection: connection strings, environment variables, service files, several hosts
 //! - exit_codes: exit codes for connection errors
 //! - output: output formats (JSON, graph)
 //! - workload: transactional and prepared modes

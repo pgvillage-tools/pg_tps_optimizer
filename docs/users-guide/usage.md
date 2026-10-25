@@ -145,8 +145,8 @@ error it was, so scripts can react to it:
 |---|---|---|
 | 0 | The run finished | |
 | 1 | An error during the run | a query fails after connecting |
-| 2 | Invalid options, environment variables, config file or connection settings: fix the command | `--spread abc`, an invalid `--max-wait` or `--query`, an unknown key in the config file, an invalid connection string or `sslmode`, a missing certificate file, an unknown service |
-| 3 | The server can't be reached, or TLS fails | a wrong host or port, `Connection refused`, a time-out, `sslmode=require` against a server without TLS, a server certificate that doesn't verify |
+| 2 | Invalid options, environment variables, config file or connection settings: fix the command | `--spread abc`, an invalid `--max-wait` or `--query`, an unknown key in the config file, an invalid connection string or `sslmode`, an unsupported `target_session_attrs`, a missing certificate file, an unknown service |
+| 3 | The server can't be reached, or TLS fails | a wrong host or port, `Connection refused`, a time-out, `sslmode=require` against a server without TLS, a server certificate that doesn't verify, no host that accepts writes (no primary) |
 | 4 | The server refuses the connection | a wrong password, no matching line in `pg_hba.conf`, a database that doesn't exist, too many connections |
 
 When a benchmark client loses its connection during the run, it logs the error and reconnects, so
