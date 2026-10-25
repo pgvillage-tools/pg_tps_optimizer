@@ -1229,7 +1229,7 @@ error it was, so scripts can react to it:</p>
 <tr>
 <td>1</td>
 <td>An error during the run</td>
-<td>a query fails after connecting</td>
+<td>no transaction finishes in a step (every query fails, or hangs)</td>
 </tr>
 <tr>
 <td>2</td>
@@ -1248,8 +1248,13 @@ error it was, so scripts can react to it:</p>
 </tr>
 </tbody>
 </table>
-<p>When a benchmark client loses its connection during the run, it logs the error and reconnects, so
-that doesn't end the run.</p>
+<p>When a query of a benchmark client fails, or the client loses its connection, it logs the error
+(with the message from PostgreSQL, like <code>error: worker 0: db error: ERROR: division by zero</code>) and
+reconnects, so that doesn't end the run. A client logs the same error only once, not on every
+retry. But when no transaction at all finishes in a step (within <code>--max-wait</code>), the run stops
+after that step with exit code 1:</p>
+<div class="language-text highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>error: no transaction finished with 1 client within max-wait: the queries fail (see the errors above) or hang
+</code></pre></div>
 
 
 

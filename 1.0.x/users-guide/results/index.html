@@ -1131,7 +1131,9 @@ go to stderr, so stdout only has the JSON:</p>
 </tr>
 </tbody>
 </table>
-<p>When a step got no samples at all (shown as <code>?</code> in the table), its measurements are <code>null</code>.</p>
+<p>When a step got no samples at all (shown as <code>?</code> in the table), its measurements are <code>null</code>. No
+transaction finished in that step, so the run stops after it, with exit code 1 (see
+<a href="../usage/#exit-codes">Exit codes</a>); the JSON document is still printed.</p>
 <h2 id="graph">Graph<a class="headerlink" href="#graph" title="Permanent link">&para;</a></h2>
 <p>With <code>--graph &lt;file&gt;</code> (or <code>PGTPSGRAPH</code>), pg_tps_optimizer also draws a graph of the TPS per number
 of clients, with the numbers of clients evenly spaced on the x axis (1, 2, 3, 5, 8, ...):</p>
