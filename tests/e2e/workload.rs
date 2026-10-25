@@ -44,7 +44,7 @@ fn check_prepares_once(name: &str, transactional: &str) {
         .filter_map(|line| line.split("execute ").nth(1))
         .filter_map(|rest| rest.split(':').next())
         .collect();
-    // One client (PGTPSRANGE=1:2), so one prepared statement
+    // One client (PGTPSRANGE=1:1), so one prepared statement
     assert_eq!(
         names.len(),
         1,

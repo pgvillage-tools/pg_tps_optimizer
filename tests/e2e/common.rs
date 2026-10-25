@@ -183,7 +183,7 @@ pub fn run_pg_tps_optimizer(home: &Path, env: &[(&str, String)]) -> Run {
     }
     // Keep the run short: only 1 client, and don't wait long for it to stabilize
     cmd.env("HOME", home)
-        .env("PGTPSRANGE", "1:2")
+        .env("PGTPSRANGE", "1:1")
         .env("PGTPSMAXWAIT", "5s")
         .envs(env.iter().map(|(k, v)| (*k, v)))
         .stdout(Stdio::piped())

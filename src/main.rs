@@ -85,7 +85,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     sampler.next()?;
     report.start();
 
-    for num_threads in Fibonacci::new(1_u32, 1_u32).take_while(|v| *v < max_threads) {
+    for num_threads in Fibonacci::new(1_u32, 1_u32).take_while(|v| *v <= max_threads) {
         if num_threads < min_threads {
             continue;
         }

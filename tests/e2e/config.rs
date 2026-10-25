@@ -22,11 +22,11 @@ fn uses_config_file() {
         ),
     )
     .unwrap();
-    // run_pg_tps_optimizer sets PGTPSRANGE=1:2, which wins over the range in the config file
+    // run_pg_tps_optimizer sets PGTPSRANGE=1:1, which wins over the range in the config file
     let run = run_pg_tps_optimizer(&home, &[("PGTPSCONFIG", config.display().to_string())]);
     run.assert_success();
     let stdout = String::from_utf8_lossy(&run.output.stdout);
-    assert!(stdout.contains("max threads: 2"), "{}", run.describe());
+    assert!(stdout.contains("max threads: 1"), "{}", run.describe());
     assert!(
         stdout.contains("min_samples: 5, spread: 7"),
         "{}",
