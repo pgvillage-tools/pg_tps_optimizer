@@ -29,7 +29,7 @@ pub struct Dsn {
 
 // The postgres crate keeps the details (like the server message) in the error source, so add
 // the sources to the message (skipping sources that are already part of it)
-fn error_chain(err: &dyn Error) -> String {
+pub fn error_chain(err: &dyn Error) -> String {
     let mut message = err.to_string();
     let mut source = err.source();
     while let Some(err) = source {

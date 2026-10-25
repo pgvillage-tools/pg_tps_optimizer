@@ -96,7 +96,9 @@ pg_tps_optimizer --output json > results.json
 | `clients`, `tps`, `latency_us`, `tps_per_latency`, `postgres_tps`, `wal_kb_per_sec` | The columns of the table (see [Columns](#columns)) |
 | `stable` | `false` for a step that didn't become stable within `--max-wait` (the `*` in the table) |
 
-When a step got no samples at all (shown as `?` in the table), its measurements are `null`.
+When a step got no samples at all (shown as `?` in the table), its measurements are `null`. No
+transaction finished in that step, so the run stops after it, with exit code 1 (see
+[Exit codes](usage.md#exit-codes)); the JSON document is still printed.
 
 ## Graph
 
