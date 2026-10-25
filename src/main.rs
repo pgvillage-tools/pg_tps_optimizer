@@ -63,20 +63,21 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         .as_max_wait()
         .map_err(|e| exit::Failure::new(exit::USAGE, e))?;
     let (min_threads, max_threads) = args.range_min_max();
+    let w: Workload = args.as_workload();
     let mut report = output::Report::new(
         args.output,
         output::Settings {
             min_clients: min_threads,
             max_clients: max_threads,
-            max_wait_seconds: max_wait.num_seconds(),
+            max_wait_seconds: max_wait.num_milliseconds() as f64 / 1000.0,
             min_samples: args.min_samples,
             spread: args.spread,
             transactional: args.transactional,
             prepared: args.prepared,
+            query: w.query(),
         },
     );
     report.info("Initializing");
-    let w: Workload = args.as_workload();
     report.info(&w.as_string());
     let default_workload = w.is_default();
     let mut sampler = pg_sampler::PgSampler::new(args.as_dsn())?;

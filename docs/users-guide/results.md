@@ -5,6 +5,7 @@ A run prints its settings, and then one line per step (number of clients):
 ```
 Initializing
 dsn:dbname='postgres' host='db1.example.com' password='*****' port='5432' sslcert='' sslkey='' sslmode='prefer' sslrootcert='' target_session_attrs='read-write' user='postgres'
+query: update pg_tps_optimizer set id=$1 where id=$1
 transactional: false
 prepared: false
 min threads: 1 max threads: 200
@@ -62,15 +63,16 @@ pg_tps_optimizer --output json > results.json
 
 ```json
 {
-  "version": "0.3.0",
+  "version": "1.0.0",
   "settings": {
     "min_clients": 1,
     "max_clients": 200,
-    "max_wait_seconds": 10,
+    "max_wait_seconds": 10.0,
     "min_samples": 10,
     "spread": 10.0,
     "transactional": false,
-    "prepared": false
+    "prepared": false,
+    "query": "update pg_tps_optimizer set id=$1 where id=$1"
   },
   "steps": [
     {
@@ -90,7 +92,7 @@ pg_tps_optimizer --output json > results.json
 | Field | Meaning |
 |---|---|
 | `version` | The version of pg_tps_optimizer |
-| `settings` | The settings of the run: the range of clients, `--max-wait` (in seconds), `--min-samples`, `--spread`, `--transactional` and `--prepared` |
+| `settings` | The settings of the run: the range of clients, `--max-wait` (in seconds, with decimals: `500ms` is `0.5`), `--min-samples`, `--spread`, `--transactional`, `--prepared` and the query the clients run (`--query`, or the update of the default workload) |
 | `steps` | One entry per step, in the order they ran |
 | `timestamp` | When the step finished (RFC 3339, local time) |
 | `clients`, `tps`, `latency_us`, `tps_per_latency`, `postgres_tps`, `wal_kb_per_sec` | The columns of the table (see [Columns](#columns)) |
