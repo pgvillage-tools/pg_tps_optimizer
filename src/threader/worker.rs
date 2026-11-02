@@ -5,6 +5,8 @@ use postgres::{Client, Statement};
 use std::sync::mpsc;
 use std::thread;
 
+use crate::dsn::error_chain;
+
 use super::workload::{client_params, Workload, WorkloadType, TABLE_NAME};
 
 pub struct Worker {
@@ -52,9 +54,18 @@ impl Worker {
     pub fn procedure(self) -> Result<(), Box<dyn std::error::Error>> {
         let mut tps: f64 = 1000_f64;
 
-        //Sleep 100 milliseconds
-        let mut client = self.initialize()?;
-        let mut session = Session::new(&mut client, &self.workload, self.id)?;
+        let mut client = self.initialize().map_err(|e| error_chain(e.as_ref()))?;
+        let mut session = Session::new(&mut client, &self.workload, self.id)
+            .map_err(|e| error_chain(e.as_ref()))?;
+        // A failing query fails again after reconnecting, so only log an error when it changes
+        let mut last_error = String::new();
+        let mut log_error = |err: &dyn std::error::Error| {
+            let message = error_chain(err);
+            if message != last_error {
+                eprintln!("error: worker {}: {}", self.id, message);
+                last_error = message;
+            }
+        };
 
         loop {
             if let Ok(done) = self.done.read() {
@@ -77,7 +88,7 @@ impl Worker {
                     tps = sample.tps();
                 }
                 Err(err) => {
-                    eprintln!("error: worker {}: {}", self.id, err);
+                    log_error(&err);
                     let sleeptime = std::time::Duration::from_millis(100);
                     thread::sleep(sleeptime);
                     // A prepared statement belongs to its connection, so prepare it again
@@ -88,10 +99,10 @@ impl Worker {
                                     client = new_client;
                                     session = new_session;
                                 }
-                                Err(err) => eprintln!("error: worker {}: {}", self.id, err),
+                                Err(err) => log_error(err.as_ref()),
                             }
                         }
-                        Err(err) => eprintln!("error: worker {}: {}", self.id, err),
+                        Err(err) => log_error(err.as_ref()),
                     }
                 }
             };
