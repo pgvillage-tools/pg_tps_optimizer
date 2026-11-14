@@ -2,14 +2,16 @@ name: CI run on PR
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
+  # In the merge queue everything runs: path filters and draft conditions only apply to pull requests
+  merge_group:
 
 permissions:
   contents: read
 
 # A new push to a PR cancels the CI run that is still running for the previous push
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,16 +20,18 @@ jobs:
   codechanges:
     runs-on: ubuntu-latest
     outputs:
-      rust: ${{ steps.filter.outputs.rust_any_changed }}
-      docker: ${{ steps.filter.outputs.docker_any_changed }}
-      docs: ${{ steps.filter.outputs.docs_any_changed }}
-      ci: ${{ steps.filter.outputs.ci_any_changed }}
+      rust: ${{ steps.decide.outputs.rust }}
+      docker: ${{ steps.decide.outputs.docker }}
+      docs: ${{ steps.decide.outputs.docs }}
     steps:
+      # changed-files only works on pull requests
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        if: github.event_name == 'pull_request'
         with:
           persist-credentials: false
       - uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96 # v47.0.6
         id: filter
+        if: github.event_name == 'pull_request'
         with:
           # rust: anything that changes how the crate builds, lints or tests (incl. e2e tests)
           # docker: changes to the image itself, or to the dependencies it compiles
@@ -56,13 +60,41 @@ jobs:
               - 'docs-requirements.txt'
             ci:
               - '.github/workflows/ci-run-on-pr.yaml'
+      - name: Decide which jobs to run
+        id: decide
+        env:
+          EVENT: ${{ github.event_name }}
+          DRAFT: ${{ github.event.pull_request.draft }}
+          CI_CHANGED: ${{ steps.filter.outputs.ci_any_changed }}
+          RUST_CHANGED: ${{ steps.filter.outputs.rust_any_changed }}
+          DOCKER_CHANGED: ${{ steps.filter.outputs.docker_any_changed }}
+          DOCS_CHANGED: ${{ steps.filter.outputs.docs_any_changed }}
+        run: |
+          if [ "${EVENT}" != pull_request ]; then
+            # Everything runs in the merge queue
+            rust=true docker=true docs=true
+          elif [ "${DRAFT}" = true ]; then
+            # Draft PRs run nothing until they are ready for review
+            rust=false docker=false docs=false
+          elif [ "${CI_CHANGED}" = true ]; then
+            # Run everything when this workflow changes, to validate it is working
+            rust=true docker=true docs=true
+          else
+            rust=${RUST_CHANGED:-false} docker=${DOCKER_CHANGED:-false} docs=${DOCS_CHANGED:-false}
+          fi
+          echo "rust=${rust} docker=${docker} docs=${docs}"
+          {
+            echo "rust=${rust}"
+            echo "docker=${docker}"
+            echo "docs=${docs}"
+          } >> "${GITHUB_OUTPUT}"
 
   lint:
     name: Rustfmt and Clippy
     runs-on: ubuntu-latest
     needs:
       - codechanges
-    if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    if: ${{ needs.codechanges.outputs.rust == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -83,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - codechanges
-    if: ${{ (needs.codechanges.outputs.docs == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    if: ${{ needs.codechanges.outputs.docs == 'true' }}
     env:
       # See the MkDocs 2 / ProperDocs notice: https://properdocs.org/
       DISABLE_MKDOCS_2_WARNING: "true"
@@ -107,7 +139,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - codechanges
-    if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    if: ${{ needs.codechanges.outputs.rust == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -124,7 +156,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - codechanges
-    if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    if: ${{ needs.codechanges.outputs.rust == 'true' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -143,7 +175,7 @@ jobs:
     needs:
       - codechanges
       - unit-test
-    if: ${{ (needs.codechanges.outputs.rust == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+    if: ${{ needs.codechanges.outputs.rust == 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -197,7 +229,7 @@ jobs:
     # (`${{ matrix.platform }}`), so a required check like "Build docker image (linux/amd64)"
     # would never be reported. Instead the job always runs, and skips its steps.
     env:
-      BUILD_IMAGE: ${{ (needs.codechanges.outputs.docker == 'true' || needs.codechanges.outputs.ci == 'true') && github.event.pull_request.draft == false }}
+      BUILD_IMAGE: ${{ needs.codechanges.outputs.docker }}
     strategy:
       fail-fast: false
       matrix:
@@ -231,3 +263,32 @@ jobs:
       - name: Smoke test docker image
         if: env.BUILD_IMAGE == 'true'
         run: docker run --rm pg_tps_optimizer:ci --help
+
+  # The only required check of this workflow, so the ruleset doesn't change when jobs are added. It must always run,
+  # and only passes when every job it needs succeeded (a skipped required check would count as a pass).
+  ci-result:
+    name: CI result
+    runs-on: ubuntu-latest
+    needs:
+      - codechanges
+      - lint
+      - docs
+      - unit-test
+      - audit
+      - e2e-test
+      - e2e-test-status
+      - docker-build
+    if: always()
+    steps:
+      - name: Evaluate the results
+        env:
+          RESULTS: ${{ toJSON(needs.*.result) }}
+          EVENT: ${{ github.event_name }}
+        run: |
+          echo "Results: ${RESULTS} (event: ${EVENT})"
+          # A job skipped by a path filter is fine on a pull request; everywhere else everything must run
+          if [ "${EVENT}" = pull_request ]; then ok='. == "success" or . == "skipped"'; else ok='. == "success"'; fi
+          if [ "$(echo "${RESULTS}" | jq -r "all(${ok})")" != true ]; then
+            echo "::error::All CI jobs must succeed"
+            exit 1
+          fi
