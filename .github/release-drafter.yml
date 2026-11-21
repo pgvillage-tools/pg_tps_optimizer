@@ -27,6 +27,7 @@ categories:
       - 'refactor'
       - 'style'
       - 'test'
+      - 'revert'
   - title: '🔒 Security'
     labels:
       - 'security'
